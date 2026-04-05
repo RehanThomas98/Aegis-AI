@@ -12,52 +12,52 @@ import './App.css';
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
 const AGENTS = {
-  medical:       { name: 'Medical Agent',       icon: '🩺', color: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.3)',   description: 'Triage, health risks, treatment protocols, medicine needs' },
-  logistics:     { name: 'Logistics Agent',     icon: '📦', color: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.3)',  description: 'Resource rationing, supply priorities, stockpile planning' },
-  security:      { name: 'Security Agent',      icon: '🛡️', color: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.3)',   description: 'Threat assessment, safe routes, access control, protocols' },
+  medical: { name: 'Medical Agent', icon: '🩺', color: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', description: 'Triage, health risks, treatment protocols, medicine needs' },
+  logistics: { name: 'Logistics Agent', icon: '📦', color: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', description: 'Resource rationing, supply priorities, stockpile planning' },
+  security: { name: 'Security Agent', icon: '🛡️', color: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.3)', description: 'Threat assessment, safe routes, access control, protocols' },
   communication: { name: 'Communication Agent', icon: '📡', color: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)', description: 'Offline comms, family contact strategy, coordination plans' },
 };
 
 const SCENARIOS = {
-  nuclear:      { name: 'Nuclear Fallout',    icon: '☢️', description: 'Radiological incident, fallout shelter protocol',  example: { type: 'nuclear',      location: 'Urban shelter', family_size: 8, shelter_capacity: 7, supplies: { water: 150, food: '14 days', masks: 20 }, vulnerable: ['elderly', 'infant'] } },
-  pandemic:     { name: 'Pandemic Outbreak',  icon: '🦠', description: 'Disease outbreak, quarantine, medical protocols',   example: { type: 'pandemic',     family_size: 5, symptomatic: 3, supplies: { medications: '5 days', masks: 10 }, vulnerable: ['asthmatic', 'elderly'] } },
-  grid_failure: { name: 'Grid Failure',       icon: '⚡', description: 'Power outage, supply chain breakdown',              example: { type: 'grid_failure', family_size: 6, duration_unknown: true, supplies: { water: '2L', food: '3 days', fuel: 'some' } } },
-  civil_unrest: { name: 'Civil Unrest',       icon: '🚨', description: 'Safety concerns, restricted movement',              example: { type: 'civil_unrest', location: 'Urban area', family_size: 4, mobility: 'limited', threat_level: 'HIGH' } },
-  multi:        { name: 'Multi-Threat',       icon: '🌪️', description: 'Combined threats — fallout, unrest, grid failure',  example: { type: 'multi',        threats: ['nuclear_fallout', 'communication_failure'], family_size: 8, supplies: { water: 150, food: '10 days', medical: 'basic' } } },
+  nuclear: { name: 'Nuclear Fallout', icon: '☢️', description: 'Radiological incident, fallout shelter protocol', example: { type: 'nuclear', location: 'Urban shelter', family_size: 8, shelter_capacity: 7, supplies: { water: 150, food: '14 days', masks: 20 }, vulnerable: ['elderly', 'infant'] } },
+  pandemic: { name: 'Pandemic Outbreak', icon: '🦠', description: 'Disease outbreak, quarantine, medical protocols', example: { type: 'pandemic', family_size: 5, symptomatic: 3, supplies: { medications: '5 days', masks: 10 }, vulnerable: ['asthmatic', 'elderly'] } },
+  grid_failure: { name: 'Grid Failure', icon: '⚡', description: 'Power outage, supply chain breakdown', example: { type: 'grid_failure', family_size: 6, duration_unknown: true, supplies: { water: '2L', food: '3 days', fuel: 'some' } } },
+  civil_unrest: { name: 'Civil Unrest', icon: '🚨', description: 'Safety concerns, restricted movement', example: { type: 'civil_unrest', location: 'Urban area', family_size: 4, mobility: 'limited', threat_level: 'HIGH' } },
+  multi: { name: 'Multi-Threat', icon: '🌪️', description: 'Combined threats — fallout, unrest, grid failure', example: { type: 'multi', threats: ['nuclear_fallout', 'communication_failure'], family_size: 8, supplies: { water: 150, food: '10 days', medical: 'basic' } } },
 };
 
 const SECTION_STYLES = {
   // Coordinator sections
-  '🔴 Situation Overview':    { bg: 'rgba(239,68,68,0.07)',    border: 'rgba(239,68,68,0.25)' },
-  '⚡ Act Now':                { bg: 'rgba(245,158,11,0.07)',   border: 'rgba(245,158,11,0.25)' },
-  '👁️ What To Watch Out For': { bg: 'rgba(249,115,22,0.07)',   border: 'rgba(249,115,22,0.25)' },
-  '🛡️ Stay Safe':              { bg: 'rgba(34,197,94,0.07)',    border: 'rgba(34,197,94,0.25)' },
-  '📦 What You Need':          { bg: 'rgba(59,130,246,0.07)',   border: 'rgba(59,130,246,0.25)' },
-  '💬 Keep In Mind':           { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)' },
+  '🔴 Situation Overview': { bg: 'rgba(239,68,68,0.07)', border: 'rgba(239,68,68,0.25)' },
+  '⚡ Act Now': { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.25)' },
+  '👁️ What To Watch Out For': { bg: 'rgba(249,115,22,0.07)', border: 'rgba(249,115,22,0.25)' },
+  '🛡️ Stay Safe': { bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.25)' },
+  '📦 What You Need': { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.25)' },
+  '💬 Keep In Mind': { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)' },
   // Medical agent sections
-  '🩺 Medical Assessment':     { bg: 'rgba(239,68,68,0.07)',    border: 'rgba(239,68,68,0.25)' },
-  '⚠️ Health Risks':           { bg: 'rgba(249,115,22,0.07)',   border: 'rgba(249,115,22,0.25)' },
-  '💊 Treatment & Medications':{ bg: 'rgba(34,197,94,0.07)',    border: 'rgba(34,197,94,0.25)' },
-  '🚑 Priority Actions':       { bg: 'rgba(245,158,11,0.07)',   border: 'rgba(245,158,11,0.25)' },
-  '🧰 Medical Supplies Needed':{ bg: 'rgba(59,130,246,0.07)',   border: 'rgba(59,130,246,0.25)' },
+  '🩺 Medical Assessment': { bg: 'rgba(239,68,68,0.07)', border: 'rgba(239,68,68,0.25)' },
+  '⚠️ Health Risks': { bg: 'rgba(249,115,22,0.07)', border: 'rgba(249,115,22,0.25)' },
+  '💊 Treatment & Medications': { bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.25)' },
+  '🚑 Priority Actions': { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.25)' },
+  '🧰 Medical Supplies Needed': { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.25)' },
   // Logistics agent sections
-  '📦 Resource Inventory':     { bg: 'rgba(59,130,246,0.07)',   border: 'rgba(59,130,246,0.25)' },
-  '⏱️ Rationing Schedule':     { bg: 'rgba(245,158,11,0.07)',   border: 'rgba(245,158,11,0.25)' },
-  '🛒 What To Stockpile':      { bg: 'rgba(34,197,94,0.07)',    border: 'rgba(34,197,94,0.25)' },
-  '📋 Distribution Plan':      { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)' },
-  '⚡ Logistics Actions':       { bg: 'rgba(249,115,22,0.07)',   border: 'rgba(249,115,22,0.25)' },
+  '📦 Resource Inventory': { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.25)' },
+  '⏱️ Rationing Schedule': { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.25)' },
+  '🛒 What To Stockpile': { bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.25)' },
+  '📋 Distribution Plan': { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)' },
+  '⚡ Logistics Actions': { bg: 'rgba(249,115,22,0.07)', border: 'rgba(249,115,22,0.25)' },
   // Security agent sections
-  '🔴 Threat Level':           { bg: 'rgba(239,68,68,0.07)',    border: 'rgba(239,68,68,0.25)' },
-  '🏠 Shelter & Safe Zones':   { bg: 'rgba(34,197,94,0.07)',    border: 'rgba(34,197,94,0.25)' },
-  '🔒 Security Protocols':     { bg: 'rgba(245,158,11,0.07)',   border: 'rgba(245,158,11,0.25)' },
-  '🚪 Access Control':         { bg: 'rgba(249,115,22,0.07)',   border: 'rgba(249,115,22,0.25)' },
-  '🏃 Escape Routes':          { bg: 'rgba(59,130,246,0.07)',   border: 'rgba(59,130,246,0.25)' },
+  '🔴 Threat Level': { bg: 'rgba(239,68,68,0.07)', border: 'rgba(239,68,68,0.25)' },
+  '🏠 Shelter & Safe Zones': { bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.25)' },
+  '🔒 Security Protocols': { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.25)' },
+  '🚪 Access Control': { bg: 'rgba(249,115,22,0.07)', border: 'rgba(249,115,22,0.25)' },
+  '🏃 Escape Routes': { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.25)' },
   // Communication agent sections
-  '📡 Communication Plan':     { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)' },
-  '👨‍👩‍👧 Family Contact Strategy':{ bg: 'rgba(34,197,94,0.07)',   border: 'rgba(34,197,94,0.25)' },
-  '📻 Offline Methods':        { bg: 'rgba(59,130,246,0.07)',   border: 'rgba(59,130,246,0.25)' },
-  '🕐 Coordination Timeline':  { bg: 'rgba(245,158,11,0.07)',   border: 'rgba(245,158,11,0.25)' },
-  '⚠️ What Could Go Wrong':    { bg: 'rgba(249,115,22,0.07)',   border: 'rgba(249,115,22,0.25)' },
+  '📡 Communication Plan': { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)' },
+  '👨‍👩‍👧 Family Contact Strategy': { bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.25)' },
+  '📻 Offline Methods': { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.25)' },
+  '🕐 Coordination Timeline': { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.25)' },
+  '⚠️ What Could Go Wrong': { bg: 'rgba(249,115,22,0.07)', border: 'rgba(249,115,22,0.25)' },
 };
 
 const LOADING_MSGS = [
@@ -133,10 +133,10 @@ function renderInline(text) {
 
 const THREAT_CONFIG = {
   CRITICAL: { color: '#ef4444', meter: 100 },
-  HIGH:     { color: '#f97316', meter: 75 },
+  HIGH: { color: '#f97316', meter: 75 },
   ELEVATED: { color: '#f59e0b', meter: 55 },
   MODERATE: { color: '#eab308', meter: 40 },
-  LOW:      { color: '#22c55e', meter: 20 },
+  LOW: { color: '#22c55e', meter: 20 },
 };
 
 function extractStats(text) {
@@ -144,13 +144,13 @@ function extractStats(text) {
   const threatMatch = text.match(/\b(CRITICAL|HIGH|ELEVATED|MODERATE|LOW)\b/);
   const threatLevel = threatMatch ? threatMatch[1] : null;
   const patterns = [
-    { re: /(\d+)\s+people/i,          label: 'People',      icon: '👥' },
-    { re: /family\s+(?:of\s+)?(\d+)/i,label: 'Family',      icon: '👨‍👩‍👧' },
-    { re: /(\d+)\s+days?\s+(?:of\s+)?water/i, label: 'Water',icon: '💧' },
-    { re: /(\d+)\s+days?\s+(?:of\s+)?food/i,  label: 'Food', icon: '🥫' },
-    { re: /(\d+)\s+days?/i,            label: 'Duration',    icon: '📅' },
-    { re: /(\d+)\s*L(?:iters?)?\s+water/i, label: 'Water (L)',icon: '💧' },
-    { re: /(\d+)\s+masks?/i,           label: 'Masks',       icon: '😷' },
+    { re: /(\d+)\s+people/i, label: 'People', icon: '👥' },
+    { re: /family\s+(?:of\s+)?(\d+)/i, label: 'Family', icon: '👨‍👩‍👧' },
+    { re: /(\d+)\s+days?\s+(?:of\s+)?water/i, label: 'Water', icon: '💧' },
+    { re: /(\d+)\s+days?\s+(?:of\s+)?food/i, label: 'Food', icon: '🥫' },
+    { re: /(\d+)\s+days?/i, label: 'Duration', icon: '📅' },
+    { re: /(\d+)\s*L(?:iters?)?\s+water/i, label: 'Water (L)', icon: '💧' },
+    { re: /(\d+)\s+masks?/i, label: 'Masks', icon: '😷' },
     { re: /(\d+)\s+(?:are\s+)?symptomatic/i, label: 'Symptomatic', icon: '🤒' },
   ];
   const tiles = [];
@@ -319,7 +319,7 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-brand">
-          <img src="/src/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
+          <img src="/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
           AEGIS
         </span>
       </div>
@@ -506,9 +506,9 @@ function ChatTab({ session, onMessagesUpdate }) {
         {messages.length === 0 && (
           <div className="chat-welcome">
             <div className="welcome-avatar animate-in">
-              <img src="/src/aegis_logo.svg" alt="AEGIS" style={{ width: '64px', height: '64px' }} />
+              <img src="/aegis_logo.svg" alt="AEGIS" style={{ width: '120px', height: '120px' }} />
             </div>
-            <h2>AEGIS is ready.</h2>
+            <h2>AEGIS is Aware</h2>
             <p>Describe your situation — I'll coordinate four specialized agents and give you a clear survival plan.</p>
           </div>
         )}
