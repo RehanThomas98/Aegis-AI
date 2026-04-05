@@ -1339,10 +1339,80 @@ body {
   color: #fff;
 }
 
+/* ── REAL-TIME ALERT BANNER ─────────────────────────────────────────────── */
+.alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  animation: slideDown 0.25s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.alert-banner--red    { background: rgba(239,68,68,0.10);  border-left: 3px solid #ef4444; }
+.alert-banner--orange { background: rgba(249,115,22,0.08); border-left: 3px solid #f97316; }
+.alert-banner--yellow { background: rgba(245,158,11,0.07); border-left: 3px solid #f59e0b; }
+
+.alert-banner-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0.38rem;
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+.alert-banner--red    .alert-banner-dot { background: #ef4444 !important; box-shadow: 0 0 6px #ef4444 !important; }
+.alert-banner--orange .alert-banner-dot { background: #f97316 !important; box-shadow: 0 0 6px #f97316 !important; }
+.alert-banner--yellow .alert-banner-dot { background: #f59e0b !important; box-shadow: 0 0 6px #f59e0b !important; }
+
+.alert-banner-body { flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+
+.alert-item { display: flex; align-items: center; gap: 0.5rem; }
+.alert-item-icon { font-size: 0.9rem; flex-shrink: 0; }
+
+.alert-item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.alert-item-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-item-detail { font-size: 0.7rem; color: var(--text-muted); }
+
+.alert-dismiss {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); padding: 0.2rem; border-radius: 4px;
+  flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s;
+}
+.alert-dismiss:hover { opacity: 1; }
+
+.alert-expand {
+  background: none; border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.15rem 0.6rem; font-size: 0.7rem; color: var(--text-muted);
+  cursor: pointer; white-space: nowrap; flex-shrink: 0; align-self: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.alert-expand:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ── CHAT INPUT TOOLBAR (export button) ─────────────────────────────────── */
 .chat-input-toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 0.4rem;
   padding: 0 0.25rem 0.25rem;
 }
 

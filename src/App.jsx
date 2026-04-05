@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, Sun, Moon, Send, LogIn, LogOut,
   Settings, MessageSquare, LayoutGrid, ChevronDown, ChevronUp, Loader2,
-  Copy, Check, Share2, X, Download, Paperclip, FileText, Image, Video, File, RefreshCw, Menu
+  Copy, Check, Share2, X, Download, Paperclip, FileText, Image, Video, File, RefreshCw, Menu, Printer
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
@@ -120,7 +120,8 @@ function groupSessions(sessions) {
 }
 const loadTheme = () => localStorage.getItem('aegis_theme') || 'dark';
 
-/** Parse "## heading\ncontent" blocks into [{heading, content}] */
+// Splits the AI response text into named sections using "## Heading" as delimiters.
+// Returns [{heading, content}]. Single-section responses skip the card layout.
 function parseSections(text) {
   if (!text) return [];
   const blocks = text.split(/\n(?=## )/);
@@ -432,6 +433,8 @@ async function getLocationFromIP() {
       const loc = api.parse(d);
       if (loc.lat && loc.lon) {
         if (loc.country_code) localStorage.setItem('aegis_country', loc.country_code);
+        localStorage.setItem('aegis_lat', String(loc.lat));
+        localStorage.setItem('aegis_lon', String(loc.lon));
         return loc;
       }
     } catch { continue; }
@@ -683,6 +686,158 @@ function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDel
   );
 }
 
+// ─── REAL-TIME ALERT BANNER ──────────────────────────────────────────────────
+
+// Great-circle distance in km between two lat/lon points
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+function disasterTypeIcon(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('earthquake') || t.includes('seismic')) return '🌍';
+  if (t.includes('flood')) return '🌊';
+  if (t.includes('cyclone') || t.includes('hurricane') || t.includes('typhoon')) return '🌀';
+  if (t.includes('fire') || t.includes('wildfire')) return '🔥';
+  if (t.includes('volcano')) return '🌋';
+  if (t.includes('tsunami')) return '🌊';
+  if (t.includes('drought')) return '🏜️';
+  if (t.includes('landslide') || t.includes('slide')) return '⛰️';
+  return '⚠️';
+}
+
+async function fetchDisasterAlerts(lat, lon) {
+  const alerts = [];
+  const now = Date.now();
+
+  // USGS: magnitude 4.5+ earthquakes from the past week, filter by distance and age
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      const data = await res.json();
+      for (const f of data.features) {
+        const [fLon, fLat] = f.geometry.coordinates;
+        const dist = haversineKm(lat, lon, fLat, fLon);
+        const ageHours = (now - f.properties.time) / 3600000;
+        // Only surface earthquakes within 1000 km and the last 72 hours
+        if (dist <= 1000 && ageHours <= 72) {
+          const mag = f.properties.mag;
+          alerts.push({
+            id: f.id,
+            icon: '🌍',
+            type: 'Earthquake',
+            title: `M${mag.toFixed(1)} — ${f.properties.place}`,
+            severity: mag >= 7 ? 'red' : mag >= 6 ? 'orange' : 'yellow',
+            detail: `${Math.round(dist)} km away · ${Math.round(ageHours)}h ago`,
+            time: f.properties.time,
+          });
+        }
+      }
+    }
+  } catch { /* silent — keep showing last data */ }
+
+  // ReliefWeb: globally active ongoing disasters for situational awareness
+  try {
+    const ctrl2 = new AbortController();
+    const t2 = setTimeout(() => ctrl2.abort(), 8000);
+    const url = 'https://api.reliefweb.int/v1/disasters?appname=aegis-crisis' +
+      '&fields[include][]=name&fields[include][]=date.created&fields[include][]=primary_type' +
+      '&fields[include][]=status&filter[field]=status&filter[value]=ongoing&limit=4&sort[]=date.created:desc';
+    const res2 = await fetch(url, { signal: ctrl2.signal });
+    clearTimeout(t2);
+    if (res2.ok) {
+      const data2 = await res2.json();
+      for (const d of data2.data || []) {
+        const f = d.fields;
+        alerts.push({
+          id: `rw-${d.id}`,
+          icon: disasterTypeIcon(f.primary_type?.name),
+          type: f.primary_type?.name || 'Disaster',
+          title: f.name,
+          severity: 'orange',
+          detail: 'Active global alert',
+          time: new Date(f.date?.created || 0).getTime(),
+        });
+      }
+    }
+  } catch { /* silent */ }
+
+  // Sort by severity (red → orange → yellow), then most recent first
+  const order = { red: 0, orange: 1, yellow: 2 };
+  return alerts
+    .sort((a, b) => order[a.severity] - order[b.severity] || b.time - a.time)
+    .slice(0, 6);
+}
+
+function AlertBanner() {
+  const [alerts, setAlerts] = useState([]);
+  const [expanded, setExpanded] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return new Set(JSON.parse(sessionStorage.getItem('aegis_dismissed_alerts') || '[]')); }
+    catch { return new Set(); }
+  });
+
+  const load = useCallback(async () => {
+    const lat = parseFloat(localStorage.getItem('aegis_lat'));
+    const lon = parseFloat(localStorage.getItem('aegis_lon'));
+    if (!lat || !lon) return;
+    const data = await fetchDisasterAlerts(lat, lon);
+    setAlerts(data);
+  }, []);
+
+  useEffect(() => {
+    // Delay first fetch so getLocationFromIP has time to write lat/lon to localStorage
+    const init = setTimeout(load, 4000);
+    const poll = setInterval(load, 10 * 60 * 1000);
+    return () => { clearTimeout(init); clearInterval(poll); };
+  }, [load]);
+
+  const dismiss = id => {
+    const next = new Set([...dismissed, id]);
+    setDismissed(next);
+    sessionStorage.setItem('aegis_dismissed_alerts', JSON.stringify([...next]));
+  };
+
+  const visible = alerts.filter(a => !dismissed.has(a.id));
+  if (visible.length === 0) return null;
+
+  const topSeverity = visible[0].severity;
+  const shown = expanded ? visible : visible.slice(0, 1);
+
+  return (
+    <div className={`alert-banner alert-banner--${topSeverity}`}>
+      <span className="alert-banner-dot" />
+      <div className="alert-banner-body">
+        {shown.map(a => (
+          <div key={a.id} className="alert-item">
+            <span className="alert-item-icon">{a.icon}</span>
+            <div className="alert-item-text">
+              <span className="alert-item-title">{a.title}</span>
+              <span className="alert-item-detail">{a.detail}</span>
+            </div>
+            <button className="alert-dismiss" onClick={() => dismiss(a.id)} title="Dismiss">
+              <X size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+      {visible.length > 1 && (
+        <button className="alert-expand" onClick={() => setExpanded(e => !e)}>
+          {expanded ? 'Show less' : `+${visible.length - 1} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── SETTINGS MODAL ───────────────────────────────────────────────────────────
 
 function UsageRing({ pct, color, size = 56, stroke = 5 }) {
@@ -872,6 +1027,89 @@ function ChatTab({ session, onMessagesUpdate, user }) {
   const fileInputRef = useRef(null);
   const messages = session?.messages || [];
 
+  const printConversation = () => {
+    const title = session?.title || 'Crisis Plan';
+    const dateStr = new Date().toLocaleString();
+
+    // Convert markdown-style text into clean print HTML
+    const formatResponse = text => {
+      const sections = parseSections(text || '');
+      if (sections.length <= 1) {
+        return `<div class="plain">${(text || '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>')}</div>`;
+      }
+      return sections.map(s => `
+        <div class="card">
+          ${s.heading ? `<h3>${s.heading.replace(/</g, '&lt;')}</h3>` : ''}
+          <div>${s.content.split('\n').map(line => {
+            const t = line.trim();
+            if (!t) return '';
+            const safe = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            if (/^[-•*]\s/.test(t)) return `<p class="bullet">• ${safe.slice(2)}</p>`;
+            if (/^\d+\.\s/.test(t)) return `<p class="bullet">${safe}</p>`;
+            return `<p>${safe}</p>`;
+          }).join('')}</div>
+        </div>`).join('');
+    };
+
+    const body = messages.map(m => {
+      if (m.role === 'user') {
+        const safe = (m.text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div class="msg-user"><div class="label">You</div><div class="bubble">${safe}</div></div>`;
+      }
+      if (m.role === 'assistant') {
+        return `<div class="msg-aegis"><div class="label">AEGIS</div>${formatResponse(m.text)}</div>`;
+      }
+      return '';
+    }).filter(Boolean).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AEGIS — ${title.replace(/</g, '&lt;')}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; background: #fff; padding: 2cm 2.5cm; font-size: 10pt; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.75rem; margin-bottom: 1.5rem; }
+  .brand { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.5px; }
+  .brand span { color: #d97706; }
+  .meta strong { display: block; font-size: 0.9rem; color: #374151; text-align: right; }
+  .meta small { font-size: 0.72rem; color: #9ca3af; }
+  .msg-user { margin-bottom: 1rem; text-align: right; }
+  .msg-user .label { font-size: 0.68rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.2rem; }
+  .msg-user .bubble { display: inline-block; background: #f3f4f6; padding: 0.5rem 0.85rem; border-radius: 12px 12px 2px 12px; max-width: 70%; text-align: left; line-height: 1.55; }
+  .msg-aegis { margin-bottom: 1.4rem; }
+  .msg-aegis .label { font-size: 0.68rem; font-weight: 700; color: #d97706; margin-bottom: 0.35rem; }
+  .card { border: 1px solid #e5e7eb; border-radius: 7px; padding: 0.65rem 0.9rem; margin-bottom: 0.45rem; break-inside: avoid; }
+  .card h3 { font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem; }
+  p { line-height: 1.6; margin-bottom: 0.2rem; color: #374151; }
+  p.bullet { padding-left: 0.9rem; }
+  .plain { line-height: 1.65; color: #374151; }
+  strong { font-weight: 700; }
+  footer { margin-top: 2rem; padding-top: 0.6rem; border-top: 1px solid #e5e7eb; font-size: 0.7rem; color: #9ca3af; text-align: center; }
+  @media print { body { padding: 1.5cm 2cm; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span>A</span>EGIS Crisis Coordinator</div>
+  <div class="meta"><strong>${title.replace(/</g, '&lt;')}</strong><small>Exported: ${dateStr}</small></div>
+</header>
+${body}
+<footer>Generated by AEGIS Crisis Coordinator &nbsp;·&nbsp; For emergency reference only</footer>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.documentElement.innerHTML = html;
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  };
+
   const exportConversation = () => {
     const lines = messages.map(m =>
       m.role === 'user' ? `You: ${m.text}` :
@@ -1023,7 +1261,10 @@ function ChatTab({ session, onMessagesUpdate, user }) {
       <div className="chat-input-area">
         {messages.length > 0 && (
           <div className="chat-input-toolbar">
-            <button className="export-btn" onClick={exportConversation} title="Export conversation">
+            <button className="export-btn" onClick={printConversation} title="Print / Save as PDF">
+              <Printer size={13} /> Print
+            </button>
+            <button className="export-btn" onClick={exportConversation} title="Export as .txt">
               <Download size={13} /> Export
             </button>
           </div>
@@ -1389,6 +1630,7 @@ export default function App() {
           </div>
         </header>
         <EnvStrip />
+        <AlertBanner />
 
         <div className="content">
           {tab === 'chat'

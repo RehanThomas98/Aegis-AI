@@ -1,65 +1,8 @@
-// ============================================
-// Aegis: Crisis Coordinator
-// Starter Code - Multi-Agent System
-// ============================================
+// AEGIS — Crisis Coordinator
+// Backend: Express + Groq (llama-3.3-70b) with Google Gemini fallback
+// Each incoming crisis message is routed to specialist agents in parallel,
+// then synthesized into a single actionable plan by the coordinator.
 
-// ============================================
-// 1. DATABASE SCHEMA (SQLite)
-// ============================================
-// Save as: db/schema.sql
-
-/*
-CREATE TABLE scenarios (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL,
-  name TEXT NOT NULL,
-  user_id INTEGER,
-  threat_level TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  location TEXT,
-  family_size INTEGER,
-  medical_conditions TEXT,
-  shelter_capacity INTEGER,
-  supplies JSON,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE decisions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  scenario_id INTEGER NOT NULL,
-  user_id INTEGER NOT NULL,
-  agent_outputs JSON,
-  coordinator_plan TEXT,
-  confidence_level REAL,
-  executed BOOLEAN DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (scenario_id) REFERENCES scenarios(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE TABLE agent_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  decision_id INTEGER NOT NULL,
-  agent_type TEXT NOT NULL,
-  input TEXT,
-  output TEXT,
-  confidence REAL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (decision_id) REFERENCES decisions(id)
-);
-*/
-
-// ============================================
-// 2. CORE API SETUP
-// ============================================
-// Save as: server.js
 require('dotenv').config();
 
 const express = require('express');
@@ -69,7 +12,7 @@ const multer = require('multer');
 const Groq = require('groq-sdk');
 const { GoogleGenAI } = require('@google/genai');
 
-// Multer — store uploads in memory
+// Store file uploads in memory rather than disk to keep the container stateless
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
@@ -123,7 +66,7 @@ async function callGemini(messages, maxTokens = 800) {
   return result.text || '';
 }
 
-// Primary caller: tries Groq, auto-falls back to Gemini on rate limit (429)
+// Primary LLM caller — tries Groq first, automatically falls back to Gemini on rate limit (HTTP 429)
 async function callAI(messages, maxTokens = 550, model = 'llama-3.3-70b-versatile') {
   try {
     return await callGroq(messages, maxTokens, model);
@@ -137,7 +80,8 @@ async function callAI(messages, maxTokens = 550, model = 'llama-3.3-70b-versatil
   }
 }
 
-// Fast, lightweight model for simple/conversational queries (500k TPD separate limit)
+// Lightweight model for conversational queries — uses a separate daily token pool
+// so casual messages don't eat into the budget reserved for full crisis analysis
 const callGroqFast = async (messages, maxTokens = 250) => {
   try {
     return await callGroq(messages, maxTokens, 'llama-3.1-8b-instant');
@@ -151,7 +95,8 @@ const callGroqFast = async (messages, maxTokens = 250) => {
   }
 };
 
-// ── National helpline database ────────────────────────────────────────────────
+// Country-specific emergency helplines injected into responses when distress
+// keywords are detected in the user's message (see CONCERN_RE below)
 const HELPLINES = {
   IN: [
     { name: 'National Emergency',        number: '112',           type: 'emergency' },
@@ -263,7 +208,8 @@ function getHelplines(countryCode, text) {
   return filtered.length ? filtered : all.filter(h => h.type === 'emergency' || h.type === 'mental');
 }
 
-// ── Usage tracking ─────────────────────────────────────────────────────────────
+// In-memory usage counters — reset at midnight UTC.
+// Exposed via GET /api/usage so the settings panel can show token consumption.
 const usageStats = {
   groq: { tokensUsed: 0, requestsToday: 0, dailyLimit: 100000 },
   gemini: { requestsToday: 0 },
@@ -286,14 +232,17 @@ function trackUsage(completion, agentKey = null) {
   if (agentKey && usageStats.agents[agentKey] !== undefined) usageStats.agents[agentKey] += 1;
 }
 
-// ── Detect purely conversational / general-knowledge queries ──────────────────
+// Detects whether a message is a casual/conversational query (e.g. "what time is it?")
+// vs a genuine crisis situation. Crisis messages go through the full multi-agent pipeline;
+// conversational ones get a fast, direct answer without the overhead.
 const CRISIS_KEYWORDS = /\b(medic|health|injur|wound|sick|ill|pain|doctor|medicine|drug|symptom|bleed|fracture|infect|dehydrat|triage|first.?aid|hospital|disease|fever|allerg|virus|treatment|trauma|burn|poison|antidote|cpr|oxygen|pulse|breath|nurse|food|water|supply|supplies|ration|stockpile|fuel|power|resource|storage|equipment|shelter|kit|inventory|provision|stock|tools|generator|battery|transport|vehicle|distribute|evacuate|secur|threat|danger|safe|protect|attack|loot|crowd|escape|route|access|patrol|weapon|defend|border|perimeter|risk|guard|crime|violence|shoot|hostile|intruder|checkpoint|communicat|signal|radio|network|coordinat|broadcast|relay|alert|notify|warn|earthquake|flood|wildfire|hurricane|tornado|tsunami|disaster|crisis|emergency|explosion|chemical|nuclear|pandemic|outbreak|collapse)\b/;
 
 function isConversational(text) {
   return !CRISIS_KEYWORDS.test((text || '').toLowerCase());
 }
 
-// ── Smart agent routing: pick only relevant agents based on message content ──
+// Returns only the agents relevant to the message, avoiding unnecessary LLM calls.
+// Falls back to all four agents if no specific domain keywords are detected.
 function routeAgents(text) {
   const m = (text || '').toLowerCase();
   const rules = {
@@ -311,9 +260,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ============================================
-// DATABASE SETUP
-// ============================================
+// ── SQLite database ───────────────────────────────────────────────────────────
 
 const db = new sqlite3.Database('./db/aegis.db', (err) => {
   if (err) {
@@ -323,9 +270,9 @@ const db = new sqlite3.Database('./db/aegis.db', (err) => {
   }
 });
 
-// ============================================
-// AGENT CLASSES (Using Google Gemini)
-// ============================================
+// ── Specialist AI agents ─────────────────────────────────────────────────────
+// Each agent has a focused system prompt for its domain.
+// They run in parallel via Promise.all inside CrisisCoordinator.coordinate().
 
 class MedicalAgent {
   async analyze(scenario, history = []) {
@@ -415,9 +362,9 @@ Format rules:
   }
 }
 
-// ============================================
-// CRISIS COORDINATOR (Uses all agents)
-// ============================================
+// ── Crisis Coordinator ────────────────────────────────────────────────────────
+// Orchestrates the specialist agents: routes to relevant ones, runs them in
+// parallel, then synthesizes their outputs into a single unified response.
 
 class CrisisCoordinator {
   constructor() {
@@ -522,9 +469,7 @@ ${agentOutputs.logistics?.split('\n').slice(0, 6).join('\n') || '- Water, food, 
 
 const coordinator = new CrisisCoordinator();
 
-// ============================================
-// API ENDPOINTS
-// ============================================
+// ── API endpoints ────────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -563,14 +508,14 @@ app.post('/api/scenario/:id/coordinate', async (req, res) => {
     const result = await coordinator.coordinate(scenario);
     
     // Store in database
-    const query = `INSERT INTO decisions (scenario_id, user_id, agent_outputs, coordinator_plan, confidence_level) 
+    const query = `INSERT INTO decisions (scenario_id, user_id, agent_outputs, coordinator_plan, confidence_level)
                    VALUES (?, ?, ?, ?, ?)`;
     db.run(query, [
       req.params.id,
       scenario.user_id,
       JSON.stringify(result.agentOutputs),
       result.finalPlan,
-      85 // confidence level
+      85,
     ]);
 
     res.json(result);
@@ -584,11 +529,12 @@ app.post('/api/ask', async (req, res) => {
   const { message, history, userName, timezone, country } = req.body;
   if (!message) return res.status(400).json({ error: 'message is required' });
 
-  // history: [{ role: 'user'|'assistant', content: string }]
+  // Keep only the last 8 exchanges to stay within token budget
   const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
 
   try {
-    // Short-circuit: conversational / general-knowledge queries skip the multi-agent pipeline
+    // Casual questions (greetings, time, general knowledge) get a direct fast answer.
+  // Only genuine crisis keywords trigger the full multi-agent pipeline.
     if (isConversational(message)) {
       const tz = timezone || 'UTC';
       const now = new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short', timeZone: tz });
@@ -604,7 +550,8 @@ app.post('/api/ask', async (req, res) => {
       return res.json({ finalPlan: reply, timestamp: new Date().toISOString() });
     }
 
-    // Inject helplines if message contains distress/concern signals
+    // Append relevant emergency helplines to the prompt when the message
+    // contains distress keywords — the AI then includes them in its response
     const countryCode = (country || 'IN').toUpperCase();
     let helplineBlock = '';
     if (CONCERN_RE.test(message)) {
@@ -769,9 +716,8 @@ app.post('/api/agent/ask', async (req, res) => {
   }
 });
 
-// ============================================
-// SERVE REACT FRONTEND (production build)
-// ============================================
+// ── Static frontend (production) ─────────────────────────────────────────────
+// Serves the Vite build output. In development, Vite runs separately on its own port.
 
 const path = require('path');
 const distPath = path.join(__dirname, 'dist');
@@ -785,16 +731,6 @@ if (require('fs').existsSync(distPath)) {
   console.log('✓ Serving React frontend from /dist');
 }
 
-// ============================================
-// START SERVER
-// ============================================
-
 app.listen(PORT, () => {
-  console.log('🌍 Aegis Crisis Coordinator API');
-  console.log(`📡 Server running on http://localhost:${PORT}`);
-  console.log('📊 Endpoints:');
-  console.log('   POST   /api/scenario');
-  console.log('   POST   /api/scenario/:id/coordinate');
-  console.log('   GET    /api/scenario/:id/history');
-  console.log('   GET    /api/health');
+  console.log(`✅ AEGIS server running on http://localhost:${PORT}`);
 });
