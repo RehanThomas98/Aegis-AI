@@ -435,10 +435,10 @@ body {
 /* ── ENV STRIP ───────────────────────────────────────────────────────────── */
 .env-strip {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   overflow-x: auto;
   flex-shrink: 0;
-  height: 76px;
+  height: 55px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   scrollbar-width: none;
@@ -447,117 +447,62 @@ body {
 .env-strip::-webkit-scrollbar { display: none; }
 
 .env-strip-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 20px;
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 20px;
+  font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px;
+  background: var(--bg-secondary); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .env-strip-label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--text-muted);
-  padding: 0 14px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; font-size: 9px; font-weight: 700; letter-spacing: 2px;
+  color: var(--text-muted); padding: 0 12px; flex-shrink: 0;
+  border-right: 1px solid var(--border); height: 100%;
 }
 .live-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--red);
-  animation: pulse 1.5s infinite;
-  display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red); animation: pulse 1.5s infinite; display: inline-block;
 }
 
 .env-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-right: 1px solid var(--border);
-  flex-shrink: 0;
-  position: relative;
-  min-width: 155px;
-  cursor: default;
-  transition: background var(--transition);
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 14px; border-right: 1px solid var(--border);
+  flex-shrink: 0; min-width: 0; height: 100%;
+  transition: background var(--transition); cursor: default;
 }
 .env-card:hover { background: var(--bg-hover); }
-.env-card::after {
-  content: '';
-  position: absolute;
-  left: 0; top: 14px; bottom: 14px;
-  width: 2px;
-  border-radius: 2px;
-  transition: background var(--transition);
-}
-.env-card.env-good::after  { background: var(--green); }
-.env-card.env-moderate::after { background: var(--yellow); }
-.env-card.env-usg::after   { background: var(--orange); }
-.env-card.env-bad::after   { background: var(--red); }
-.env-card.env-vbad::after  { background: var(--purple); }
-.env-card.env-haz::after   { background: #dc2626; }
 
-.env-icon {
-  width: 34px; height: 34px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 17px;
-  flex-shrink: 0;
-}
+.env-card-loc { min-width: 160px; }
 
-.env-card-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.env-pin { font-size: 18px; flex-shrink: 0; }
+.env-icon-sm { font-size: 18px; flex-shrink: 0; }
+
+.env-card-body { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 
 .env-card-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-muted); line-height: 1.2;
 }
-.env-card-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
-  line-height: 1.1;
+.env-city {
+  font-size: 13px; font-weight: 700; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;
 }
-.env-card-value .unit {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-muted);
-  font-family: 'Outfit', sans-serif;
+.env-card-title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; display: flex; align-items: center; gap: 4px; line-height: 1.3;
 }
+.env-card-title .unit { font-size: 11px; color: var(--text-muted); font-weight: 400; }
 .env-card-sub {
-  font-size: 10px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 130px;
+  font-size: 9px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; line-height: 1.3;
 }
 
-.env-badge {
-  position: absolute;
-  top: 7px; right: 8px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  padding: 2px 5px;
-  border-radius: 4px;
+/* Inline badge (no absolute positioning) */
+.env-ibadge {
+  display: inline-block;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 1px 5px; border-radius: 3px; line-height: 1.6; white-space: nowrap;
 }
 .env-good     { background: rgba(52,211,153,0.15);  color: var(--green); }
 .env-moderate { background: rgba(251,191,36,0.15);  color: var(--yellow); }
@@ -566,18 +511,26 @@ body {
 .env-vbad     { background: rgba(167,139,250,0.15); color: var(--purple); }
 .env-haz      { background: rgba(220,38,38,0.2);    color: #ef4444; }
 
-/* AQI ring */
-.aqi-ring { position: relative; width: 42px; height: 42px; flex-shrink: 0; }
-.aqi-ring svg { width: 42px; height: 42px; transform: rotate(-90deg); }
-.aqi-ring-bg   { fill: none; stroke: var(--border); stroke-width: 3; }
-.aqi-ring-fill { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
-.aqi-ring-value {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700;
-  color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
+/* Mini ring (AQI, Radiation, Weather temp) */
+.mini-ring { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
+.mini-ring svg { width: 38px; height: 38px; transform: rotate(-90deg); }
+.mini-ring-bg   { fill: none; stroke: var(--border); stroke-width: 3; }
+.mini-ring-fill { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+.mini-ring-val {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace; line-height: 1;
 }
+
+/* Refresh button */
+.env-refresh-btn {
+  margin-left: auto; flex-shrink: 0; padding: 0 14px; height: 100%;
+  background: none; border: none; border-left: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; display: flex; align-items: center;
+  transition: color var(--transition), background var(--transition);
+}
+.env-refresh-btn:hover:not(:disabled) { color: var(--accent); background: var(--bg-hover); }
+.env-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── WELCOME / HERO ──────────────────────────────────────────────────────── */
 .chat-container {
