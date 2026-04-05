@@ -39,12 +39,7 @@
     </clipPath>
   </defs>
 
-  <!-- Background circle (dark) -->
-  <circle cx="256" cy="256" r="240" fill="#0B1120" />
-  <circle cx="256" cy="256" r="240" fill="url(#innerGlow)" />
 
-  <!-- Subtle ring -->
-  <circle cx="256" cy="256" r="220" fill="none" stroke="#0A8FE0" stroke-width="0.5" opacity="0.3" />
 
   <!-- Shield outline - main shape -->
   <path d="M256 72 L400 130 C400 130 410 275 256 424 C102 275 112 130 112 130 Z"

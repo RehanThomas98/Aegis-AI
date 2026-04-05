@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
 import {
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -15,18 +15,25 @@ export default function AuthModal({ onClose }) {
   const [name, setName] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
   const clearError = () => setError('');
+
+  const showSuccess = () => {
+    setSuccess(true);
+    setTimeout(onClose, 1500);
+  };
 
   const handleGoogle = async () => {
     setLoading(true); clearError();
     try {
       await signInWithPopup(auth, googleProvider);
-      onClose();
+      showSuccess();
     } catch (e) {
       setError(friendlyError(e.code));
-    } finally { setLoading(false); }
+      setLoading(false);
+    }
   };
 
   const handleEmail = async e => {
@@ -41,13 +48,26 @@ export default function AuthModal({ onClose }) {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      onClose();
+      showSuccess();
     } catch (e) {
       setError(friendlyError(e.code));
-    } finally { setLoading(false); }
+      setLoading(false);
+    }
   };
 
   const switchMode = () => { setMode(m => m === 'signin' ? 'signup' : 'signin'); clearError(); };
+
+  if (success) {
+    return (
+      <div className="auth-overlay">
+        <div className="auth-modal auth-success-modal">
+          <CheckCircle2 size={56} className="auth-success-icon" />
+          <h2 className="auth-success-title">Welcome to AEGIS</h2>
+          <p className="auth-success-sub">You're signed in and ready.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-overlay" onClick={e => e.target === e.currentTarget && onClose()}>

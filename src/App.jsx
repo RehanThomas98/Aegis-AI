@@ -58,6 +58,8 @@ const SECTION_STYLES = {
   '📻 Offline Methods': { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.25)' },
   '🕐 Coordination Timeline': { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.25)' },
   '⚠️ What Could Go Wrong': { bg: 'rgba(249,115,22,0.07)', border: 'rgba(249,115,22,0.25)' },
+  // Helplines section
+  '📞 Emergency Helplines': { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.5)' },
 };
 
 const LOADING_MSGS = [
@@ -69,6 +71,16 @@ const LOADING_MSGS = [
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 const genId = () => Math.random().toString(36).slice(2, 10);
+
+function friendlyApiError(msg) {
+  const m = (msg || '').toLowerCase();
+  if (/429|rate.?limit|quota|tokens.*day|tpd/i.test(m)) return 'Apologies! Your request quota has been reached. Please try again in a few minutes, or click Retry below.';
+  if (/network|failed to fetch|load failed|networkerror/i.test(m)) return 'Connection lost. Please check your internet connection and retry.';
+  if (/500|internal server/i.test(m)) return 'Something went wrong on our end. Please try again.';
+  if (/503|unavailable/i.test(m)) return 'Service temporarily unavailable. Please try again shortly.';
+  if (/401|403|unauthorized|forbidden/i.test(m)) return 'Authentication error. Please refresh the page.';
+  return 'Something went wrong. Please try again.';
+}
 const loadSessions = () => { try { return JSON.parse(localStorage.getItem('aegis_sessions') || '[]'); } catch { return []; } };
 const saveSessions = s => localStorage.setItem('aegis_sessions', JSON.stringify(s));
 
@@ -161,7 +173,9 @@ function RichContent({ text }) {
 function renderInline(text) {
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Highlight phone/helpline numbers: standalone digit strings with optional +, spaces, dashes, parens
+    .replace(/(?<![\/\w])(\+?[\d][\d\s\-()\u2013.]{5,}\d)(?!\w)/g, '<span class="phone-number">$1</span>');
 }
 
 // ─── VISUAL SNAPSHOT ─────────────────────────────────────────────────────────
@@ -277,7 +291,7 @@ function ShareModal({ msg, onClose }) {
 function ResponseCards({ text, showSnapshot = true }) {
   const sections = parseSections(text);
   if (sections.length <= 1) {
-    return <pre className="chat-plan">{text}</pre>;
+    return <RichContent text={text || ''} />;
   }
   return (
     <>
@@ -285,8 +299,9 @@ function ResponseCards({ text, showSnapshot = true }) {
       <div className="response-cards">
         {sections.map(({ heading, content }, i) => {
           const style = SECTION_STYLES[heading] || { bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.1)' };
+          const isHelpline = heading.includes('Helpline');
           return (
-            <div key={i} className="response-card" style={{ background: style.bg, borderColor: style.border }}>
+            <div key={i} className={`response-card${isHelpline ? ' helpline-card' : ''}`} style={{ background: style.bg, borderColor: style.border }}>
               {heading && <h3 className="card-heading">{heading}</h3>}
               <RichContent text={content} />
             </div>
@@ -307,7 +322,7 @@ function LoadingBubble() {
   }, []);
   return (
     <div className="chat-bubble assistant">
-      <div className="chat-avatar aegis">🧭</div>
+      <div className="chat-avatar aegis"><AegisAvatar /></div>
       <div className="chat-bubble-content">
         <div className="typing-dots"><span /><span /><span /></div>
         <p className="loading-msg">{LOADING_MSGS[idx]}</p>
@@ -345,13 +360,13 @@ function AttachmentPreview({ file, onRemove }) {
 // ─── ENV STRIP ───────────────────────────────────────────────────────────────
 
 const WMO_DESC = {
-  0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',
-  45:'Foggy',48:'Rime fog',51:'Light drizzle',53:'Mod. drizzle',55:'Dense drizzle',
-  61:'Light rain',63:'Moderate rain',65:'Heavy rain',
-  71:'Light snow',73:'Moderate snow',75:'Heavy snow',77:'Snow grains',
-  80:'Light showers',81:'Mod. showers',82:'Violent showers',
-  85:'Light snow showers',86:'Heavy snow showers',
-  95:'Thunderstorm',96:'Thunderstorm+hail',99:'Heavy thunderstorm',
+  0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+  45: 'Foggy', 48: 'Rime fog', 51: 'Light drizzle', 53: 'Mod. drizzle', 55: 'Dense drizzle',
+  61: 'Light rain', 63: 'Moderate rain', 65: 'Heavy rain',
+  71: 'Light snow', 73: 'Moderate snow', 75: 'Heavy snow', 77: 'Snow grains',
+  80: 'Light showers', 81: 'Mod. showers', 82: 'Violent showers',
+  85: 'Light snow showers', 86: 'Heavy snow showers',
+  95: 'Thunderstorm', 96: 'Thunderstorm+hail', 99: 'Heavy thunderstorm',
 };
 function wmoIcon(c) {
   if (c === 0) return '☀️'; if (c <= 2) return '⛅'; if (c === 3) return '☁️';
@@ -360,29 +375,29 @@ function wmoIcon(c) {
 }
 function wmoDesc(c) { return WMO_DESC[c] || 'Unknown'; }
 function degToCompass(d) {
-  return ['N','NE','E','SE','S','SW','W','NW'][Math.round(d / 45) % 8];
+  return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(d / 45) % 8];
 }
 function aqiInfo(v) {
-  if (v <= 50)  return { label: 'Good',        cls: 'env-good',     color: 'var(--green)' };
-  if (v <= 100) return { label: 'Moderate',    cls: 'env-moderate', color: 'var(--yellow)' };
-  if (v <= 150) return { label: 'Sensitive',   cls: 'env-usg',      color: 'var(--orange)' };
-  if (v <= 200) return { label: 'Unhealthy',   cls: 'env-bad',      color: 'var(--red)' };
-  if (v <= 300) return { label: 'Very Unhlt.', cls: 'env-vbad',     color: 'var(--purple)' };
-  return        { label: 'Hazardous',          cls: 'env-haz',      color: '#dc2626' };
+  if (v <= 50) return { label: 'Good', cls: 'env-good', color: 'var(--green)' };
+  if (v <= 100) return { label: 'Moderate', cls: 'env-moderate', color: 'var(--yellow)' };
+  if (v <= 150) return { label: 'Sensitive', cls: 'env-usg', color: 'var(--orange)' };
+  if (v <= 200) return { label: 'Unhealthy', cls: 'env-bad', color: 'var(--red)' };
+  if (v <= 300) return { label: 'Very Unhlt.', cls: 'env-vbad', color: 'var(--purple)' };
+  return { label: 'Hazardous', cls: 'env-haz', color: '#dc2626' };
 }
 function radInfo(v) {
-  if (v <= 0.10) return { label: 'Normal',   cls: 'env-good',     color: 'var(--green)' };
-  if (v <= 0.20) return { label: 'Low',      cls: 'env-good',     color: 'var(--green)' };
+  if (v <= 0.10) return { label: 'Normal', cls: 'env-good', color: 'var(--green)' };
+  if (v <= 0.20) return { label: 'Low', cls: 'env-good', color: 'var(--green)' };
   if (v <= 0.50) return { label: 'Elevated', cls: 'env-moderate', color: 'var(--yellow)' };
-  if (v <= 1.0)  return { label: 'High',     cls: 'env-usg',      color: 'var(--orange)' };
-  return         { label: 'Danger',          cls: 'env-bad',      color: 'var(--red)' };
+  if (v <= 1.0) return { label: 'High', cls: 'env-usg', color: 'var(--orange)' };
+  return { label: 'Danger', cls: 'env-bad', color: 'var(--red)' };
 }
 function uvInfo(v) {
-  if (v <= 2)  return { label: 'Low',       cls: 'env-good' };
-  if (v <= 5)  return { label: 'Moderate',  cls: 'env-moderate' };
-  if (v <= 7)  return { label: 'High',      cls: 'env-usg' };
+  if (v <= 2) return { label: 'Low', cls: 'env-good' };
+  if (v <= 5) return { label: 'Moderate', cls: 'env-moderate' };
+  if (v <= 7) return { label: 'High', cls: 'env-usg' };
   if (v <= 10) return { label: 'Very High', cls: 'env-bad' };
-  return       { label: 'Extreme',          cls: 'env-haz' };
+  return { label: 'Extreme', cls: 'env-haz' };
 }
 
 function MiniRing({ value, max, color, label }) {
@@ -402,9 +417,9 @@ function MiniRing({ value, max, color, label }) {
 
 async function getLocationFromIP() {
   const apis = [
-    { url: 'https://ipapi.co/json/',        parse: d => ({ lat: d.latitude,  lon: d.longitude, city: d.city }) },
-    { url: 'https://ipwho.is/',             parse: d => ({ lat: d.latitude,  lon: d.longitude, city: d.city }) },
-    { url: 'https://freeipapi.com/api/json',parse: d => ({ lat: d.latitude,  lon: d.longitude, city: d.cityName }) },
+    { url: 'https://ipapi.co/json/', parse: d => ({ lat: d.latitude, lon: d.longitude, city: d.city, country_code: d.country_code }) },
+    { url: 'https://ipwho.is/', parse: d => ({ lat: d.latitude, lon: d.longitude, city: d.city, country_code: d.country_code }) },
+    { url: 'https://freeipapi.com/api/json', parse: d => ({ lat: d.latitude, lon: d.longitude, city: d.cityName, country_code: d.countryCode }) },
   ];
   for (const api of apis) {
     try {
@@ -415,10 +430,13 @@ async function getLocationFromIP() {
       if (!r.ok) continue;
       const d = await r.json();
       const loc = api.parse(d);
-      if (loc.lat && loc.lon) return loc;
+      if (loc.lat && loc.lon) {
+        if (loc.country_code) localStorage.setItem('aegis_country', loc.country_code);
+        return loc;
+      }
     } catch { continue; }
   }
-  return { lat: 28.6139, lon: 77.2090, city: 'New Delhi' }; // final fallback
+  return { lat: 28.6139, lon: 77.2090, city: 'New Delhi', country_code: 'IN' }; // final fallback
 }
 
 function EnvStrip() {
@@ -485,9 +503,9 @@ function EnvStrip() {
 
   if (!env) return null;
 
-  const aqi  = aqiInfo(env.aqi);
-  const rad  = radInfo(parseFloat(env.rad));
-  const uv   = uvInfo(parseFloat(env.uv));
+  const aqi = aqiInfo(env.aqi);
+  const rad = radInfo(parseFloat(env.rad));
+  const uv = uvInfo(parseFloat(env.uv));
   const tempColor = env.temp > 35 ? 'var(--red)' : env.temp > 25 ? 'var(--orange)' : env.temp < 5 ? 'var(--purple)' : 'var(--accent)';
 
   return (
@@ -496,10 +514,10 @@ function EnvStrip() {
 
       {/* Location */}
       {loc && (
-        <div className="env-card env-card-loc">
+        <div className="env-card env-card-loc" style={{ '--env-accent': '#22d3ee' }}>
           <span className="env-pin">📍</span>
           <div className="env-card-body">
-            <div className="env-card-label">Location</div>
+            <div className="env-card-label"><span className="env-label-dot" />Location</div>
             <div className="env-city">{loc.city}</div>
             <div className="env-card-sub">{loc.lat?.toFixed(4)}°, {loc.lon?.toFixed(4)}°</div>
           </div>
@@ -507,50 +525,50 @@ function EnvStrip() {
       )}
 
       {/* Weather */}
-      <div className="env-card">
+      <div className="env-card" style={{ '--env-accent': tempColor }}>
         <MiniRing value={env.temp + 20} max={70} color={tempColor} label={`${env.temp}°`} />
         <div className="env-card-body">
-          <div className="env-card-label">Weather</div>
+          <div className="env-card-label"><span className="env-label-dot" />Weather</div>
           <div className="env-card-title">{wmoIcon(env.code)} {wmoDesc(env.code)}</div>
           <div className="env-card-sub">Humidity {env.humidity}% · Wind {env.windSpeed} km/h</div>
         </div>
       </div>
 
       {/* AQI */}
-      <div className="env-card">
+      <div className="env-card" style={{ '--env-accent': aqi.color }}>
         <MiniRing value={env.aqi} max={300} color={aqi.color} label={env.aqi} />
         <div className="env-card-body">
-          <div className="env-card-label">Air Quality</div>
+          <div className="env-card-label"><span className="env-label-dot" />Air Quality</div>
           <span className={`env-ibadge ${aqi.cls}`}>{aqi.label}</span>
           <div className="env-card-sub">PM2.5: {env.pm25} · PM10: {env.pm10}</div>
         </div>
       </div>
 
       {/* Radiation */}
-      <div className="env-card">
+      <div className="env-card" style={{ '--env-accent': rad.color }}>
         <MiniRing value={parseFloat(env.rad)} max={0.5} color={rad.color} label={env.rad} />
         <div className="env-card-body">
-          <div className="env-card-label">Radiation</div>
+          <div className="env-card-label"><span className="env-label-dot" />Radiation</div>
           <span className={`env-ibadge ${rad.cls}`}>{rad.label}</span>
           <div className="env-card-sub">~{env.cpm} CPM · μSv/h</div>
         </div>
       </div>
 
       {/* UV */}
-      <div className="env-card">
+      <div className="env-card" style={{ '--env-accent': uv.color }}>
         <div className="env-icon-sm">🔆</div>
         <div className="env-card-body">
-          <div className="env-card-label">UV Index</div>
+          <div className="env-card-label"><span className="env-label-dot" />UV Index</div>
           <div className="env-card-title">{env.uv} <span className={`env-ibadge ${uv.cls}`}>{uv.label}</span></div>
           <div className="env-card-sub">Today's peak</div>
         </div>
       </div>
 
       {/* Wind */}
-      <div className="env-card">
+      <div className="env-card" style={{ '--env-accent': 'var(--accent)' }}>
         <div className="env-icon-sm">💨</div>
         <div className="env-card-body">
-          <div className="env-card-label">Wind</div>
+          <div className="env-card-label"><span className="env-label-dot" />Wind</div>
           <div className="env-card-title">{env.windSpeed} <span className="unit">km/h</span></div>
           <div className="env-card-sub">{degToCompass(env.windDir)} · {env.windDir}°</div>
         </div>
@@ -566,7 +584,7 @@ function EnvStrip() {
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut }) {
+function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut, onSettings }) {
   const [editId, setEditId] = useState(null);
   const [editVal, setEditVal] = useState('');
   const [search, setSearch] = useState('');
@@ -639,7 +657,7 @@ function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDel
           </div>
         </div>
 
-        <button className="sidebar-footer-btn">
+        <button className="sidebar-footer-btn" onClick={onSettings}>
           <Settings size={15} /><span>Settings</span>
         </button>
 
@@ -665,9 +683,124 @@ function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDel
   );
 }
 
+// ─── SETTINGS MODAL ───────────────────────────────────────────────────────────
+
+function UsageRing({ pct, color, size = 56, stroke = 5 }) {
+  const r = (size - stroke * 2) / 2;
+  const circ = 2 * Math.PI * r;
+  const filled = circ * (1 - Math.min(pct, 100) / 100);
+  return (
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={circ} strokeDashoffset={filled} strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+    </svg>
+  );
+}
+
+function SettingsModal({ onClose }) {
+  const [usage, setUsage] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = () => {
+    setRefreshing(true);
+    fetch('/api/usage').then(r => r.json()).then(d => { setUsage(d); setRefreshing(false); }).catch(() => setRefreshing(false));
+  };
+
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 10000);
+    return () => clearInterval(t);
+  }, []);
+
+  const AGENTS_META = {
+    medical:       { icon: '🩺', label: 'Medical',       color: '#ef4444' },
+    logistics:     { icon: '📦', label: 'Logistics',     color: '#3b82f6' },
+    security:      { icon: '🛡️', label: 'Security',      color: '#22c55e' },
+    communication: { icon: '📡', label: 'Comms',         color: '#a78bfa' },
+    coordinator:   { icon: '🧭', label: 'Coordinator',   color: 'var(--accent)' },
+  };
+
+  const groq = usage?.groq;
+  const groqPct = groq?.percentUsed ?? 0;
+  const groqColor = groqPct >= 90 ? '#ef4444' : groqPct >= 60 ? '#f59e0b' : '#22c55e';
+
+  return (
+    <div className="settings-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="settings-modal">
+        <div className="settings-header">
+          <h2><Settings size={16} /> Settings</h2>
+          <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <div className="settings-section">
+          <h3 className="settings-section-title">API Usage</h3>
+          <div className="settings-usage-cards">
+            {/* Groq card */}
+            <div className="settings-usage-card" onClick={refresh} title="Click to refresh" style={{ cursor: 'pointer' }}>
+              <div className="usage-ring-wrap">
+                <UsageRing pct={groqPct} color={groqColor} size={72} stroke={6} />
+                <span className="usage-ring-pct" style={{ color: groqColor }}>{groqPct}%</span>
+              </div>
+              <div className="usage-card-info">
+                <p className="usage-card-title">Groq (llama-3.3-70b)</p>
+                <p className="usage-card-stat"><strong>{(groq?.tokensUsed ?? 0).toLocaleString()}</strong> / {(groq?.dailyLimit ?? 100000).toLocaleString()} tokens</p>
+                <p className="usage-card-stat usage-remaining">{(groq?.tokensRemaining ?? 0).toLocaleString()} remaining</p>
+                <p className="usage-card-reset">🔄 Resets in <strong>{groq?.resetIn ?? '—'}</strong></p>
+              </div>
+            </div>
+
+            {/* Gemini fallback card */}
+            <div className="settings-usage-card" onClick={refresh} title="Click to refresh" style={{ cursor: 'pointer' }}>
+              <div className="usage-ring-wrap">
+                <UsageRing pct={0} color="#22c55e" size={72} stroke={6} />
+                <span className="usage-ring-pct" style={{ color: '#22c55e' }}>✓</span>
+              </div>
+              <div className="usage-card-info">
+                <p className="usage-card-title">Gemini 2.0 Flash</p>
+                <p className="usage-card-stat"><strong>{usage?.gemini?.requestsToday ?? 0}</strong> fallback calls today</p>
+                <p className="usage-card-stat usage-remaining">Active when Groq limit hit</p>
+                <p className="usage-card-reset">🔄 Resets daily at midnight UTC</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <h3 className="settings-section-title">
+            Agent Activity Today
+            {refreshing && <Loader2 size={13} className="spin" style={{ marginLeft: 8, opacity: 0.6 }} />}
+          </h3>
+          <div className="settings-agents-grid">
+            {Object.entries(AGENTS_META).map(([key, meta]) => {
+              const calls = usage?.agents?.[key] ?? 0;
+              const agentPct = Math.min(100, calls * 5); // visual — 20 calls = 100%
+              return (
+                <div key={key} className="settings-agent-tile" onClick={refresh} title="Click to refresh" style={{ cursor: 'pointer' }}>
+                  <div className="agent-tile-ring-wrap">
+                    <UsageRing pct={agentPct} color={meta.color} size={52} stroke={5} />
+                    <span className="agent-tile-icon">{meta.icon}</span>
+                  </div>
+                  <p className="agent-tile-label">{meta.label}</p>
+                  <p className="agent-tile-calls">{calls} call{calls !== 1 ? 's' : ''}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <p className="settings-note">Usage data resets at midnight UTC. Groq free tier: 100k tokens/day.</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── CHAT MESSAGE ─────────────────────────────────────────────────────────────
 
-function ChatMessage({ msg, onShare, avatarIcon = '🧭' }) {
+const AegisAvatar = () => <img src="/aegis_logo.svg" className="aegis-avatar-img" alt="AEGIS" />;
+
+function ChatMessage({ msg, onShare, onRetry }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -693,13 +826,20 @@ function ChatMessage({ msg, onShare, avatarIcon = '🧭' }) {
   );
   if (msg.role === 'error') return (
     <div className="chat-bubble assistant">
-      <div className="chat-avatar aegis">{avatarIcon}</div>
-      <div className="chat-bubble-content error-content"><p>{msg.text}</p></div>
+      <div className="chat-avatar aegis"><AegisAvatar /></div>
+      <div className="chat-bubble-content error-content">
+        <p>{msg.text}</p>
+        {msg.retryText && onRetry && (
+          <button className="retry-btn" onClick={() => onRetry(msg.retryText)}>
+            <RefreshCw size={13} /> Retry
+          </button>
+        )}
+      </div>
     </div>
   );
   return (
     <div className="chat-bubble assistant">
-      <div className="chat-avatar aegis">{avatarIcon}</div>
+      <div className="chat-avatar aegis"><AegisAvatar /></div>
       <div className="chat-bubble-content">
         <ResponseCards text={msg.text} />
         <div className="msg-actions">
@@ -721,15 +861,41 @@ function ChatMessage({ msg, onShare, avatarIcon = '🧭' }) {
 
 // ─── CHAT TAB ────────────────────────────────────────────────────────────────
 
-function ChatTab({ session, onMessagesUpdate }) {
+function ChatTab({ session, onMessagesUpdate, user }) {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [shareMsg, setShareMsg] = useState(null);
   const [attachment, setAttachment] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const messages = session?.messages || [];
+
+  const exportConversation = () => {
+    const lines = messages.map(m =>
+      m.role === 'user' ? `You: ${m.text}` :
+      m.role === 'assistant' ? `AEGIS: ${m.text}` : null
+    ).filter(Boolean).join('\n\n');
+    const header = `AEGIS Conversation Export\n${new Date().toLocaleString()}\n${'='.repeat(50)}\n\n`;
+    const blob = new Blob([header + lines], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `aegis-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const fetchSuggestions = async (lastMsg, lastReply) => {
+    try {
+      const res = await fetch('/api/suggestions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lastMessage: lastMsg, lastResponse: lastReply }),
+      });
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+    } catch { setSuggestions([]); }
+  };
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
@@ -740,45 +906,71 @@ function ChatTab({ session, onMessagesUpdate }) {
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
   };
 
+  // Core text sender — takes explicit baseMessages so retry can pass cleaned list
+  const sendText = async (text, baseMessages) => {
+    if (!text || loading) return;
+    const userMsg = { role: 'user', text, timestamp: new Date().toISOString() };
+    const next = [...baseMessages, userMsg];
+    onMessagesUpdate(next);
+    setLoading(true);
+    try {
+      const history = baseMessages.slice(-8).map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text || '',
+      }));
+      const res = await fetch('/api/ask', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text, history,
+          userName: user?.displayName?.split(' ')[0] || null,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          country: localStorage.getItem('aegis_country') || 'IN',
+        }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      onMessagesUpdate([...next, { role: 'assistant', text: data.finalPlan, timestamp: data.timestamp }]);
+      fetchSuggestions(text, data.finalPlan);
+    } catch (e) {
+      onMessagesUpdate([...next, { role: 'error', text: friendlyApiError(e.message), retryText: text }]);
+    } finally { setLoading(false); }
+  };
+
   const send = async () => {
     const text = input.trim();
     if ((!text && !attachment) || loading) return;
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    const isImage = attachment?.type.startsWith('image/');
-    const previewUrl = isImage ? URL.createObjectURL(attachment) : null;
-    const userMsg = {
-      role: 'user', text: text || '',
-      fileName: attachment?.name, fileMime: attachment?.type, previewUrl,
-    };
-    const next = [...messages, userMsg];
-    onMessagesUpdate(next);
-    setAttachment(null);
-    setLoading(true);
-
-    try {
-      let data;
-      if (attachment) {
+    if (attachment) {
+      const isImage = attachment.type.startsWith('image/');
+      const previewUrl = isImage ? URL.createObjectURL(attachment) : null;
+      const userMsg = { role: 'user', text: text || '', fileName: attachment.name, fileMime: attachment.type, previewUrl };
+      const next = [...messages, userMsg];
+      onMessagesUpdate(next);
+      setAttachment(null);
+      setLoading(true);
+      try {
         const fd = new FormData();
         fd.append('file', attachment);
         if (text) fd.append('message', text);
         const res = await fetch('/api/upload', { method: 'POST', body: fd });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        data = await res.json();
+        const data = await res.json();
         onMessagesUpdate([...next, { role: 'assistant', text: data.finalPlan || data.response, timestamp: data.timestamp }]);
-      } else {
-        const res = await fetch('/api/ask', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }),
-        });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        data = await res.json();
-        onMessagesUpdate([...next, { role: 'assistant', text: data.finalPlan, timestamp: data.timestamp }]);
-      }
-    } catch (e) {
-      onMessagesUpdate([...next, { role: 'error', text: `Error: ${e.message}` }]);
-    } finally { setLoading(false); }
+      } catch (e) {
+        onMessagesUpdate([...next, { role: 'error', text: friendlyApiError(e.message), retryText: text }]);
+      } finally { setLoading(false); }
+      setAttachment(null);
+    } else {
+      await sendText(text, messages);
+    }
+  };
+
+  const handleRetry = (retryText) => {
+    const cleaned = messages.slice(0, -1); // remove the error message
+    onMessagesUpdate(cleaned);
+    sendText(retryText, cleaned);
   };
 
   const handleKey = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
@@ -792,10 +984,10 @@ function ChatTab({ session, onMessagesUpdate }) {
           <div className="chat-welcome">
             <div className="logo-container animate-in">
               <svg className="connection-lines" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <line x1="90" y1="40" x2="90" y2="65" stroke="var(--red)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
-                <line x1="140" y1="90" x2="115" y2="90" stroke="var(--green)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
-                <line x1="90" y1="140" x2="90" y2="115" stroke="var(--yellow)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
-                <line x1="40" y1="90" x2="65" y2="90" stroke="var(--purple)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
+                <line x1="90" y1="40" x2="90" y2="65" stroke="var(--red)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
+                <line x1="140" y1="90" x2="115" y2="90" stroke="var(--green)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
+                <line x1="90" y1="140" x2="90" y2="115" stroke="var(--yellow)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
+                <line x1="40" y1="90" x2="65" y2="90" stroke="var(--purple)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
               </svg>
               <div className="logo-shield">
                 <img src="/aegis_logo.svg" alt="AEGIS" style={{ width: '80px', height: '80px' }} />
@@ -823,12 +1015,28 @@ function ChatTab({ session, onMessagesUpdate }) {
             </div>
           </div>
         )}
-        {messages.map((msg, i) => <ChatMessage key={i} msg={msg} onShare={setShareMsg} />)}
+        {messages.map((msg, i) => <ChatMessage key={i} msg={msg} onShare={setShareMsg} onRetry={handleRetry} />)}
         {loading && <LoadingBubble />}
         <div ref={bottomRef} />
       </div>
 
       <div className="chat-input-area">
+        {messages.length > 0 && (
+          <div className="chat-input-toolbar">
+            <button className="export-btn" onClick={exportConversation} title="Export conversation">
+              <Download size={13} /> Export
+            </button>
+          </div>
+        )}
+        {suggestions.length > 0 && (
+          <div className="preset-bubbles">
+            {suggestions.map((s, i) => (
+              <button key={i} className="preset-bubble" onClick={() => { setInput(s); setSuggestions([]); textareaRef.current?.focus(); }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         {attachment && (
           <div className="attachment-preview-row">
             <AttachmentPreview file={attachment} onRemove={() => setAttachment(null)} />
@@ -842,8 +1050,9 @@ function ChatTab({ session, onMessagesUpdate }) {
           <textarea ref={textareaRef} className="chat-input" rows={1}
             placeholder="Describe your crisis situation…"
             value={input}
-            onChange={e => { setInput(e.target.value); autoResize(); }}
+            onChange={e => { setInput(e.target.value); autoResize(); if (e.target.value) setSuggestions([]); }}
             onKeyDown={handleKey}
+            spellCheck="true" autoCorrect="on" autoCapitalize="sentences" lang="en"
             disabled={loading} />
           <button className="chat-send-btn" onClick={send} disabled={loading || (!input.trim() && !attachment)}>
             {loading ? <Loader2 size={16} className="spin" /> : <Send size={15} strokeWidth={2.5} />}
@@ -909,9 +1118,13 @@ function AgentChatTab({ agentKey, onBack }) {
         data = await res.json();
         setMessages([...next, { role: 'assistant', text: data.response, timestamp: data.timestamp }]);
       } else {
+        const history = messages.slice(-8).map(m => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.text || '',
+        }));
         const res = await fetch('/api/agent/ask', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentType: agentKey, message: text }),
+          body: JSON.stringify({ agentType: agentKey, message: text, history }),
         });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         data = await res.json();
@@ -973,6 +1186,7 @@ function AgentChatTab({ agentKey, onBack }) {
             value={input}
             onChange={e => { setInput(e.target.value); autoResize(); }}
             onKeyDown={handleKey}
+            spellCheck="true" autoCorrect="on" autoCapitalize="sentences" lang="en"
             disabled={loading} />
           <button className="chat-send-btn" onClick={send} disabled={loading || (!input.trim() && !attachment)}>
             {loading ? <Loader2 size={16} className="spin" /> : <Send size={15} strokeWidth={2.5} />}
@@ -1076,6 +1290,8 @@ export default function App() {
   const [currentId, setCurrentId] = useState(() => { const s = loadSessions(); return s[0]?.id || null; });
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showLogoutAnim, setShowLogoutAnim] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [apiStatus, setApiStatus] = useState(null); // null=checking, true=ok, false=down
 
@@ -1127,6 +1343,16 @@ export default function App() {
   return (
     <div className="app-shell">
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showLogoutAnim && (
+        <div className="auth-overlay">
+          <div className="auth-modal auth-success-modal">
+            <span style={{ fontSize: '2.8rem', lineHeight: 1 }}>👋</span>
+            <h2 className="auth-success-title">Sorry to see you leave</h2>
+            <p className="auth-success-sub">Stay safe out there. Come back anytime.</p>
+          </div>
+        </div>
+      )}
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         isOpen={sidebarOpen}
@@ -1138,7 +1364,8 @@ export default function App() {
         theme={theme} onTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         user={user}
         onSignIn={() => setShowAuth(true)}
-        onSignOut={() => signOut(auth)}
+        onSettings={() => setShowSettings(true)}
+        onSignOut={() => { setShowLogoutAnim(true); setTimeout(() => { signOut(auth); setShowLogoutAnim(false); }, 1600); }}
       />
 
       <div className="main">
@@ -1165,7 +1392,7 @@ export default function App() {
 
         <div className="content">
           {tab === 'chat'
-            ? <ChatTab key={currentId} session={currentSession} onMessagesUpdate={updateMessages} />
+            ? <ChatTab key={currentId} session={currentSession} onMessagesUpdate={updateMessages} user={user} />
             : <ScenariosTab />}
         </div>
       </div>
