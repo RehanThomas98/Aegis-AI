@@ -864,9 +864,11 @@ export default function App() {
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-        setApiStatus(res.ok && data.status === 'ok' && data.ai);
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 5000);
+        const res = await fetch('/api/health', { signal: ctrl.signal });
+        clearTimeout(t);
+        setApiStatus(res.ok);
       } catch {
         setApiStatus(false);
       }
