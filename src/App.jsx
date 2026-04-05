@@ -318,7 +318,10 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-brand">🧭 AEGIS</span>
+        <span className="sidebar-brand">
+          <img src="/src/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
+          AEGIS
+        </span>
       </div>
 
       <button className="new-chat-btn" onClick={onNew}>
@@ -502,7 +505,9 @@ function ChatTab({ session, onMessagesUpdate }) {
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="chat-welcome">
-            <div className="welcome-avatar animate-in">🧭</div>
+            <div className="welcome-avatar animate-in">
+              <img src="/src/aegis_logo.svg" alt="AEGIS" style={{ width: '64px', height: '64px' }} />
+            </div>
             <h2>AEGIS is ready.</h2>
             <p>Describe your situation — I'll coordinate four specialized agents and give you a clear survival plan.</p>
           </div>

@@ -71,6 +71,14 @@ body {
   font-weight: 600;
   letter-spacing: 0.3px;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.brand-logo {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .new-chat-btn {
@@ -851,6 +859,7 @@ body {
   margin-bottom: 1.5rem;
 }
 .auth-logo { font-size: 2rem; display: block; margin-bottom: 0.4rem; }
+.auth-logo-img { width: 52px; height: 52px; display: block; margin: 0 auto 0.4rem; }
 .auth-brand h2 { font-size: 1.1rem; font-weight: 700; color: var(--text); letter-spacing: 0.5px; }
 .auth-brand p  { font-size: 0.8rem; color: var(--text2); margin-top: 0.2rem; }
 

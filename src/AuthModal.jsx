@@ -56,7 +56,7 @@ export default function AuthModal({ onClose }) {
         <button className="auth-close" onClick={onClose}><X size={16} /></button>
 
         <div className="auth-brand">
-          <span className="auth-logo">🧭</span>
+          <img src="/src/aegis_logo.svg" className="auth-logo-img" alt="AEGIS" />
           <h2>AEGIS</h2>
           <p>{mode === 'signin' ? 'Sign in to save your sessions' : 'Create your account'}</p>
         </div>
