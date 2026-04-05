@@ -1,10 +1,14 @@
-FROM node:20-slim
+FROM node:20
 
 WORKDIR /app
 
-# Install all deps (including devDeps for vite build)
+# Install build tools needed for sqlite3 native compilation
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# Install all deps and rebuild sqlite3 from source for this environment
 COPY package*.json ./
 RUN npm install
+RUN npm rebuild sqlite3 --build-from-source
 
 # Copy source and build frontend
 COPY . .
