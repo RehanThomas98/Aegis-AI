@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, Sun, Moon, Send, LogIn, LogOut,
   Settings, MessageSquare, LayoutGrid, ChevronDown, ChevronUp, Loader2,
-  Copy, Check, Share2, X, Download, Paperclip, FileText, Image, Video, File, RefreshCw
+  Copy, Check, Share2, X, Download, Paperclip, FileText, Image, Video, File, RefreshCw, Menu
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
@@ -566,7 +566,7 @@ function EnvStrip() {
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut }) {
+function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut }) {
   const [editId, setEditId] = useState(null);
   const [editVal, setEditVal] = useState('');
   const [search, setSearch] = useState('');
@@ -577,7 +577,7 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
   const groups = groupSessions(filtered);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
       <div className="sidebar-header">
         <span className="sidebar-brand">
           <img src="/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
@@ -1076,6 +1076,7 @@ export default function App() {
   const [currentId, setCurrentId] = useState(() => { const s = loadSessions(); return s[0]?.id || null; });
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [apiStatus, setApiStatus] = useState(null); // null=checking, true=ok, false=down
 
   useEffect(() => {
@@ -1126,10 +1127,12 @@ export default function App() {
   return (
     <div className="app-shell">
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
+        isOpen={sidebarOpen}
         sessions={sessions} currentId={currentId}
-        onSelect={id => { setCurrentId(id); setTab('chat'); }}
-        onNew={newChat}
+        onSelect={id => { setCurrentId(id); setTab('chat'); setSidebarOpen(false); }}
+        onNew={() => { newChat(); setSidebarOpen(false); }}
         onRename={(id, title) => persist(sessions.map(s => s.id === id ? { ...s, title } : s))}
         onDelete={id => { const n = sessions.filter(s => s.id !== id); persist(n); if (currentId === id) setCurrentId(n[0]?.id || null); }}
         theme={theme} onTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
@@ -1140,6 +1143,9 @@ export default function App() {
 
       <div className="main">
         <header className="app-header">
+          <button className="menu-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
+            <Menu size={18} />
+          </button>
           <nav className="header-tabs">
             <button className={`header-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>
               <MessageSquare size={14} /> Chat
