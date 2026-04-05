@@ -391,7 +391,12 @@ const coordinator = new CrisisCoordinator();
 // ============================================
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Aegis Crisis Coordinator active' });
+  res.json({
+    status: 'ok',
+    ai: !!process.env.GROQ_API_KEY,
+    model: 'llama-3.3-70b-versatile',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.post('/api/scenario', (req, res) => {

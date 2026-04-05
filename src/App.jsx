@@ -71,6 +71,41 @@ const LOADING_MSGS = [
 const genId = () => Math.random().toString(36).slice(2, 10);
 const loadSessions = () => { try { return JSON.parse(localStorage.getItem('aegis_sessions') || '[]'); } catch { return []; } };
 const saveSessions = s => localStorage.setItem('aegis_sessions', JSON.stringify(s));
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+  if (hrs < 48) return 'Yesterday';
+  const days = Math.floor(hrs / 24);
+  return `${days} days ago`;
+}
+
+function getDateGroup(iso) {
+  if (!iso) return 'Earlier';
+  const now = new Date();
+  const d = new Date(iso);
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays < 1) return 'Today';
+  if (diffDays < 2) return 'Yesterday';
+  if (diffDays < 7) return 'This Week';
+  return 'Earlier';
+}
+
+function groupSessions(sessions) {
+  const order = ['Today', 'Yesterday', 'This Week', 'Earlier'];
+  const groups = {};
+  for (const s of sessions) {
+    const g = getDateGroup(s.createdAt);
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(s);
+  }
+  return order.filter(g => groups[g]).map(g => ({ label: g, items: groups[g] }));
+}
 const loadTheme = () => localStorage.getItem('aegis_theme') || 'dark';
 
 /** Parse "## heading\ncontent" blocks into [{heading, content}] */
@@ -317,15 +352,20 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
   useEffect(() => { if (editId) inputRef.current?.focus(); }, [editId]);
 
   const filtered = sessions.filter(s => s.title.toLowerCase().includes(search.toLowerCase()));
+  const groups = groupSessions(filtered);
 
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-brand">
           <img src="/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
-          <span className="brand-accent">A</span>EGIS
+          <span className="brand-name">AEGIS</span>
         </span>
       </div>
+
+      <button className="new-chat-btn" onClick={onNew}>
+        <Plus size={15} strokeWidth={2.5} /> New Chat
+      </button>
 
       <div className="sidebar-search">
         <input
@@ -337,42 +377,49 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
         />
       </div>
 
-      <button className="new-chat-btn" onClick={onNew}>
-        <Plus size={15} strokeWidth={2.5} /> New chat
-      </button>
-
       <div className="sidebar-sessions">
         {filtered.length === 0 && <p className="sidebar-empty">{search ? 'No matches' : 'No conversations yet'}</p>}
-        {filtered.map(s => (
-          <div key={s.id} className={`session-item ${s.id === currentId ? 'active' : ''}`} onClick={() => onSelect(s.id)}>
-            {editId === s.id ? (
-              <input ref={inputRef} className="rename-input" value={editVal}
-                onChange={e => setEditVal(e.target.value)}
-                onBlur={() => { if (editVal.trim()) onRename(s.id, editVal.trim()); setEditId(null); }}
-                onKeyDown={e => { if (e.key === 'Enter') { if (editVal.trim()) onRename(s.id, editVal.trim()); setEditId(null); } if (e.key === 'Escape') setEditId(null); }}
-                onClick={e => e.stopPropagation()} />
-            ) : (
-              <>
-                <MessageSquare size={13} className="session-icon" />
-                <span className="session-title">{s.title}</span>
-                <div className="session-actions">
-                  <button className="icon-btn" title="Rename" onClick={e => { e.stopPropagation(); setEditId(s.id); setEditVal(s.title); }}><Pencil size={12} /></button>
-                  <button className="icon-btn danger" title="Delete" onClick={e => { e.stopPropagation(); onDelete(s.id); }}><Trash2 size={12} /></button>
-                </div>
-              </>
-            )}
+        {groups.map(({ label, items }) => (
+          <div key={label} className="session-group">
+            <p className="session-group-label">{label}</p>
+            {items.map(s => (
+              <div key={s.id} className={`session-item ${s.id === currentId ? 'active' : ''}`} onClick={() => onSelect(s.id)}>
+                {editId === s.id ? (
+                  <input ref={inputRef} className="rename-input" value={editVal}
+                    onChange={e => setEditVal(e.target.value)}
+                    onBlur={() => { if (editVal.trim()) onRename(s.id, editVal.trim()); setEditId(null); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { if (editVal.trim()) onRename(s.id, editVal.trim()); setEditId(null); } if (e.key === 'Escape') setEditId(null); }}
+                    onClick={e => e.stopPropagation()} />
+                ) : (
+                  <>
+                    <div className="session-item-body">
+                      <span className="session-title">{s.title}</span>
+                      <span className="session-time">{timeAgo(s.createdAt)}</span>
+                    </div>
+                    <div className="session-actions">
+                      <button className="icon-btn" title="Rename" onClick={e => { e.stopPropagation(); setEditId(s.id); setEditVal(s.title); }}><Pencil size={12} /></button>
+                      <button className="icon-btn danger" title="Delete" onClick={e => { e.stopPropagation(); onDelete(s.id); }}><Trash2 size={12} /></button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         ))}
       </div>
 
       <div className="sidebar-footer">
         <div className="sidebar-footer-btn theme-toggle-row" onClick={onTheme} title="Toggle theme">
-          <Moon size={14} className="theme-icon" />
+          {theme === 'dark' ? <Moon size={14} className="theme-icon" /> : <Sun size={14} className="theme-icon" />}
+          <span className="theme-label">{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
           <div className="theme-toggle-track">
             <div className={`theme-toggle-thumb ${theme === 'light' ? 'right' : ''}`} />
           </div>
-          <Sun size={14} className="theme-icon" />
         </div>
+
+        <button className="sidebar-footer-btn">
+          <Settings size={15} /><span>Settings</span>
+        </button>
 
         {user ? (
           <div className="sidebar-user">
@@ -540,13 +587,15 @@ function ChatTab({ session, onMessagesUpdate }) {
             <p>Describe your situation — I'll coordinate four specialized agents and give you a clear survival plan.</p>
             <div className="welcome-scenarios">
               {[
-                { label: '🌍 Earthquake', prompt: 'Major earthquake just hit our city, buildings collapsed, family of 4 trapped on 3rd floor, no power or water' },
-                { label: '🌊 Flood', prompt: 'Flash flooding in our area, water rising fast, family of 3 on second floor, limited food and medication' },
-                { label: '🔥 Wildfire', prompt: 'Wildfire spreading toward our neighborhood, elderly parent with mobility issues, 2 hours to evacuate' },
-                { label: '🌀 Hurricane', prompt: 'Category 4 hurricane making landfall in 6 hours, family of 5 with infant, sheltering in place, low supplies' },
-              ].map(({ label, prompt }) => (
+                { icon: '🌍', label: 'Earthquake', sub: 'Urban collapse & rescue', prompt: 'Major earthquake just hit our city, buildings collapsed, family of 4 trapped on 3rd floor, no power or water' },
+                { icon: '🌊', label: 'Flood', sub: 'Evacuation planning', prompt: 'Flash flooding in our area, water rising fast, family of 3 on second floor, limited food and medication' },
+                { icon: '🔥', label: 'Wildfire', sub: 'Perimeter & shelter', prompt: 'Wildfire spreading toward our neighborhood, elderly parent with mobility issues, 2 hours to evacuate' },
+                { icon: '🌀', label: 'Hurricane', sub: 'Storm surge response', prompt: 'Category 4 hurricane making landfall in 6 hours, family of 5 with infant, sheltering in place, low supplies' },
+              ].map(({ icon, label, sub, prompt }) => (
                 <div key={label} className="welcome-scenario-card" onClick={() => { setInput(prompt); textareaRef.current?.focus(); setTimeout(autoResize, 0); }}>
-                  {label}
+                  <span className="wsc-icon">{icon}</span>
+                  <span className="wsc-label">{label}</span>
+                  <span className="wsc-sub">{sub}</span>
                 </div>
               ))}
             </div>
@@ -805,10 +854,26 @@ export default function App() {
   const [currentId, setCurrentId] = useState(() => { const s = loadSessions(); return s[0]?.id || null; });
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [apiStatus, setApiStatus] = useState(null); // null=checking, true=ok, false=down
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => setUser(u || null));
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
+        const data = await res.json();
+        setApiStatus(res.ok && data.status === 'ok' && data.ai);
+      } catch {
+        setApiStatus(false);
+      }
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -859,9 +924,11 @@ export default function App() {
               <LayoutGrid size={14} /> Scenarios
             </button>
           </nav>
-          <div className="header-status">
+          <div className={`header-status ${apiStatus === false ? 'status-down' : apiStatus === null ? 'status-checking' : ''}`}>
             <span className="status-dot" />
-            <span className="status-text">All systems operational</span>
+            <span className="status-text">
+              {apiStatus === null ? 'Connecting…' : apiStatus ? 'All systems operational' : 'AI service unavailable'}
+            </span>
           </div>
         </header>
 
