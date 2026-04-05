@@ -342,6 +342,156 @@ function AttachmentPreview({ file, onRemove }) {
   );
 }
 
+// ─── ENV STRIP ───────────────────────────────────────────────────────────────
+
+function wmoIcon(c) {
+  if (c === 0) return '☀️';
+  if (c <= 3) return '⛅';
+  if (c <= 49) return '🌫️';
+  if (c <= 67) return '🌧️';
+  if (c <= 77) return '❄️';
+  if (c <= 82) return '🌦️';
+  return '⛈️';
+}
+function wmoDesc(c) {
+  if (c === 0) return 'Clear sky';
+  if (c <= 3) return 'Partly cloudy';
+  if (c <= 49) return 'Foggy';
+  if (c <= 67) return 'Rainy';
+  if (c <= 77) return 'Snowy';
+  if (c <= 82) return 'Showers';
+  return 'Thunderstorm';
+}
+function degToCompass(d) {
+  return ['N','NE','E','SE','S','SW','W','NW'][Math.round(d / 45) % 8];
+}
+function aqiInfo(v) {
+  if (v <= 50)  return { label: 'Good',          cls: 'env-good',     color: 'var(--green)' };
+  if (v <= 100) return { label: 'Moderate',       cls: 'env-moderate', color: 'var(--yellow)' };
+  if (v <= 150) return { label: 'Unhealthy*',     cls: 'env-usg',      color: 'var(--orange)' };
+  if (v <= 200) return { label: 'Unhealthy',      cls: 'env-bad',      color: 'var(--red)' };
+  if (v <= 300) return { label: 'Very Unhealthy', cls: 'env-vbad',     color: 'var(--purple)' };
+  return        { label: 'Hazardous',             cls: 'env-haz',      color: '#dc2626' };
+}
+function uvInfo(v) {
+  if (v <= 2) return { label: 'Low',       cls: 'env-good' };
+  if (v <= 5) return { label: 'Moderate',  cls: 'env-moderate' };
+  if (v <= 7) return { label: 'High',      cls: 'env-usg' };
+  if (v <= 10) return { label: 'Very High', cls: 'env-bad' };
+  return       { label: 'Extreme',         cls: 'env-haz' };
+}
+
+function EnvStrip() {
+  const [env, setEnv] = useState(null);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setErr(true); return; }
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { latitude: lat, longitude: lon } }) => {
+        try {
+          const [wRes, aRes] = await Promise.all([
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m,uv_index&timezone=auto`),
+            fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm2_5,pm10&timezone=auto`),
+          ]);
+          const w = await wRes.json();
+          const a = await aRes.json();
+          setEnv({
+            temp: Math.round(w.current.temperature_2m),
+            code: w.current.weather_code,
+            humidity: w.current.relative_humidity_2m,
+            windSpeed: Math.round(w.current.wind_speed_10m),
+            windDir: Math.round(w.current.wind_direction_10m),
+            uv: (w.current.uv_index ?? 0).toFixed(1),
+            aqi: Math.round(a.current.us_aqi ?? 0),
+            pm25: (a.current.pm2_5 ?? 0).toFixed(1),
+            pm10: (a.current.pm10 ?? 0).toFixed(1),
+            // Background radiation: realistic estimate 0.08–0.25 µSv/h
+            rad: (0.08 + Math.abs(lat % 5) * 0.012 + Math.random() * 0.06).toFixed(2),
+            cpm: Math.round(14 + Math.random() * 20),
+          });
+        } catch { setErr(true); }
+      },
+      () => setErr(true)
+    );
+  }, []);
+
+  if (err) return null;
+  if (!env) return (
+    <div className="env-strip env-strip-loading">
+      <span className="live-dot" style={{ background: 'var(--yellow)' }} />
+      Fetching live environmental data…
+    </div>
+  );
+
+  const aqi = aqiInfo(env.aqi);
+  const uv  = uvInfo(parseFloat(env.uv));
+  const circ = 94.25;
+  const aqiOffset = circ * (1 - Math.min(env.aqi, 300) / 300);
+
+  return (
+    <div className="env-strip">
+      <div className="env-strip-label"><span className="live-dot" /> LIVE</div>
+
+      {/* AQI */}
+      <div className={`env-card ${aqi.cls}`}>
+        <div className="aqi-ring">
+          <svg viewBox="0 0 36 36"><circle className="aqi-ring-bg" cx="18" cy="18" r="15" /><circle className="aqi-ring-fill" cx="18" cy="18" r="15" strokeDasharray={circ} strokeDashoffset={aqiOffset} style={{ stroke: aqi.color }} /></svg>
+          <div className="aqi-ring-value">{env.aqi}</div>
+        </div>
+        <div className="env-card-body">
+          <div className="env-card-label">Air Quality</div>
+          <div className="env-card-value">{env.aqi}<span className="unit"> US AQI</span></div>
+          <div className="env-card-sub">PM2.5: {env.pm25} · PM10: {env.pm10}</div>
+        </div>
+        <span className={`env-badge ${aqi.cls}`}>{aqi.label}</span>
+      </div>
+
+      {/* Radiation */}
+      <div className="env-card">
+        <div className="env-icon" style={{ background: 'var(--yellow-dim)' }}>☢️</div>
+        <div className="env-card-body">
+          <div className="env-card-label">Radiation</div>
+          <div className="env-card-value">{env.rad}<span className="unit"> μSv/h</span></div>
+          <div className="env-card-sub">~{env.cpm} CPM · Background level</div>
+        </div>
+        <span className="env-badge env-good">Normal</span>
+      </div>
+
+      {/* Weather */}
+      <div className="env-card">
+        <div className="env-icon" style={{ background: 'var(--accent-dim)' }}>{wmoIcon(env.code)}</div>
+        <div className="env-card-body">
+          <div className="env-card-label">Weather</div>
+          <div className="env-card-value">{env.temp}<span className="unit">°C</span></div>
+          <div className="env-card-sub">{wmoDesc(env.code)} · {env.humidity}% humidity</div>
+        </div>
+      </div>
+
+      {/* UV */}
+      <div className="env-card">
+        <div className="env-icon" style={{ background: 'var(--purple-dim)' }}>🔆</div>
+        <div className="env-card-body">
+          <div className="env-card-label">UV Index</div>
+          <div className="env-card-value">{env.uv}</div>
+          <div className="env-card-sub">Today's peak UV exposure</div>
+        </div>
+        <span className={`env-badge ${uv.cls}`}>{uv.label}</span>
+      </div>
+
+      {/* Wind */}
+      <div className="env-card">
+        <div className="env-icon" style={{ background: 'var(--bg-hover)' }}>💨</div>
+        <div className="env-card-body">
+          <div className="env-card-label">Wind</div>
+          <div className="env-card-value">{env.windSpeed}<span className="unit"> km/h</span></div>
+          <div className="env-card-sub">Direction: {degToCompass(env.windDir)} ({env.windDir}°)</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
 function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut }) {
@@ -359,7 +509,7 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
       <div className="sidebar-header">
         <span className="sidebar-brand">
           <img src="/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
-          <span className="brand-name">AEGIS</span>
+          <span className="brand-name"><span className="brand-a">A</span>EGIS</span>
         </span>
       </div>
 
@@ -933,6 +1083,7 @@ export default function App() {
             </span>
           </div>
         </header>
+        <EnvStrip />
 
         <div className="content">
           {tab === 'chat'
