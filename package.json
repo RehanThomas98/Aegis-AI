@@ -1,0 +1,45 @@
+{
+  "name": "aegis-crisis-coordinator",
+  "version": "0.1.0",
+  "description": "Multi-agent AI system for survival coordination in post-apocalyptic scenarios",
+  "main": "aegis-server.js",
+  "scripts": {
+    "start": "node aegis-server.js",
+    "dev:server": "nodemon aegis-server.js",
+    "dev:ui": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "setup-db": "node db/setup.js"
+  },
+  "keywords": [
+    "multi-agent",
+    "crisis-coordination",
+    "survival",
+    "ai",
+    "google",
+    "gemini"
+  ],
+  "author": "aegis Team",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase": "^12.11.0",
+    "groq-sdk": "^1.1.2",
+    "lucide-react": "^1.7.0",
+    "multer": "^2.1.1",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "nodemon": "^3.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "vite": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
