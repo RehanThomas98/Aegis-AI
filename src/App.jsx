@@ -312,16 +312,29 @@ function AttachmentPreview({ file, onRemove }) {
 function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut }) {
   const [editId, setEditId] = useState(null);
   const [editVal, setEditVal] = useState('');
+  const [search, setSearch] = useState('');
   const inputRef = useRef(null);
   useEffect(() => { if (editId) inputRef.current?.focus(); }, [editId]);
+
+  const filtered = sessions.filter(s => s.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-brand">
           <img src="/aegis_logo.svg" className="brand-logo" alt="AEGIS" />
-          AEGIS
+          <span className="brand-accent">A</span>EGIS
         </span>
+      </div>
+
+      <div className="sidebar-search">
+        <input
+          className="sidebar-search-input"
+          type="text"
+          placeholder="Search conversations…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
       <button className="new-chat-btn" onClick={onNew}>
@@ -329,8 +342,8 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
       </button>
 
       <div className="sidebar-sessions">
-        {sessions.length === 0 && <p className="sidebar-empty">No conversations yet</p>}
-        {sessions.map(s => (
+        {filtered.length === 0 && <p className="sidebar-empty">{search ? 'No matches' : 'No conversations yet'}</p>}
+        {filtered.map(s => (
           <div key={s.id} className={`session-item ${s.id === currentId ? 'active' : ''}`} onClick={() => onSelect(s.id)}>
             {editId === s.id ? (
               <input ref={inputRef} className="rename-input" value={editVal}
@@ -353,10 +366,13 @@ function Sidebar({ sessions, currentId, onSelect, onNew, onRename, onDelete, the
       </div>
 
       <div className="sidebar-footer">
-        <button className="sidebar-footer-btn" onClick={onTheme} title="Toggle theme">
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-        </button>
+        <div className="sidebar-footer-btn theme-toggle-row" onClick={onTheme} title="Toggle theme">
+          <Moon size={14} className="theme-icon" />
+          <div className="theme-toggle-track">
+            <div className={`theme-toggle-thumb ${theme === 'light' ? 'right' : ''}`} />
+          </div>
+          <Sun size={14} className="theme-icon" />
+        </div>
 
         {user ? (
           <div className="sidebar-user">
@@ -505,11 +521,35 @@ function ChatTab({ session, onMessagesUpdate }) {
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="chat-welcome">
-            <div className="welcome-avatar animate-in">
-              <img src="/aegis_logo.svg" alt="AEGIS" style={{ width: '120px', height: '120px' }} />
+            <div className="logo-container animate-in">
+              <svg className="connection-lines" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <line x1="90" y1="40" x2="90" y2="65" stroke="var(--red)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
+                <line x1="140" y1="90" x2="115" y2="90" stroke="var(--green)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
+                <line x1="90" y1="140" x2="90" y2="115" stroke="var(--yellow)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
+                <line x1="40" y1="90" x2="65" y2="90" stroke="var(--purple)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3"/>
+              </svg>
+              <div className="logo-shield">
+                <img src="/aegis_logo.svg" alt="AEGIS" style={{ width: '80px', height: '80px' }} />
+              </div>
+              <div className="agent-node node-assess">🔍<span className="agent-label">ASSESS</span></div>
+              <div className="agent-node node-resource">📦<span className="agent-label">RESOURCE</span></div>
+              <div className="agent-node node-comms">📡<span className="agent-label">COMMS</span></div>
+              <div className="agent-node node-evac">🚨<span className="agent-label">EVACUATE</span></div>
             </div>
-            <h2>AEGIS is Aware</h2>
+            <h2>AEGIS is Aware!</h2>
             <p>Describe your situation — I'll coordinate four specialized agents and give you a clear survival plan.</p>
+            <div className="welcome-scenarios">
+              {[
+                { label: '🌍 Earthquake', prompt: 'Major earthquake just hit our city, buildings collapsed, family of 4 trapped on 3rd floor, no power or water' },
+                { label: '🌊 Flood', prompt: 'Flash flooding in our area, water rising fast, family of 3 on second floor, limited food and medication' },
+                { label: '🔥 Wildfire', prompt: 'Wildfire spreading toward our neighborhood, elderly parent with mobility issues, 2 hours to evacuate' },
+                { label: '🌀 Hurricane', prompt: 'Category 4 hurricane making landfall in 6 hours, family of 5 with infant, sheltering in place, low supplies' },
+              ].map(({ label, prompt }) => (
+                <div key={label} className="welcome-scenario-card" onClick={() => { setInput(prompt); textareaRef.current?.focus(); setTimeout(autoResize, 0); }}>
+                  {label}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((msg, i) => <ChatMessage key={i} msg={msg} onShare={setShareMsg} />)}
@@ -819,6 +859,10 @@ export default function App() {
               <LayoutGrid size={14} /> Scenarios
             </button>
           </nav>
+          <div className="header-status">
+            <span className="status-dot" />
+            <span className="status-text">All systems operational</span>
+          </div>
         </header>
 
         <div className="content">
