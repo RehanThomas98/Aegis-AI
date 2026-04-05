@@ -10,6 +10,9 @@ RUN npm install
 COPY . .
 RUN npm run build
 
+# Create db directory and initialize the database
+RUN mkdir -p db && node db/setup.js
+
 # Remove devDeps after build to slim the image
 RUN npm prune --omit=dev
 
