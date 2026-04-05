@@ -885,7 +885,7 @@ function AgentChatTab({ agentKey, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="chat-input-area" style={{ padding: '0.75rem 1rem 1rem' }}>
+      <div className="chat-input-area">
         {attachment && (
           <div className="attachment-preview-row">
             <AttachmentPreview file={attachment} onRemove={() => setAttachment(null)} />
