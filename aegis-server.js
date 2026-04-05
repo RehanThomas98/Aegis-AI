@@ -546,6 +546,22 @@ app.post('/api/agent/ask', async (req, res) => {
 });
 
 // ============================================
+// SERVE REACT FRONTEND (production build)
+// ============================================
+
+const path = require('path');
+const distPath = path.join(__dirname, 'dist');
+if (require('fs').existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    }
+  });
+  console.log('✓ Serving React frontend from /dist');
+}
+
+// ============================================
 // START SERVER
 // ============================================
 
