@@ -1,0 +1,51 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_PROJECT_ID=${_VITE_FIREBASE_PROJECT_ID}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_STORAGE_BUCKET=${_VITE_FIREBASE_STORAGE_BUCKET}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_MESSAGING_SENDER_ID=${_VITE_FIREBASE_MESSAGING_SENDER_ID}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}'
+      - '-t'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/aegis-crisis:${COMMIT_SHA}'
+      - '-t'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/aegis-crisis:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/aegis-crisis']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update'
+      - '${_SERVICE_NAME}'
+      - '--platform=managed'
+      - '--region=${_DEPLOY_REGION}'
+      - '--image=${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/aegis-crisis:${COMMIT_SHA}'
+
+substitutions:
+  _AR_HOSTNAME: europe-west1-docker.pkg.dev
+  _AR_PROJECT_ID: ai-agents-491116
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _DEPLOY_REGION: europe-west1
+  _SERVICE_NAME: aegis-crisis
+  _VITE_FIREBASE_API_KEY: AIzaSyC9V2IjE6tmpF5IVZ3AjufhTOl7ZjDJY-Q
+  _VITE_FIREBASE_AUTH_DOMAIN: aegis-crisis.firebaseapp.com
+  _VITE_FIREBASE_PROJECT_ID: aegis-crisis
+  _VITE_FIREBASE_STORAGE_BUCKET: aegis-crisis.firebasestorage.app
+  _VITE_FIREBASE_MESSAGING_SENDER_ID: '444475147155'
+  _VITE_FIREBASE_APP_ID: 1:444475147155:web:b43acc93450d744df21e66
+
+options:
+  logging: CLOUD_LOGGING_ONLY
