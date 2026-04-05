@@ -601,6 +601,7 @@ body {
   box-sizing: border-box;
 }
 .chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages-welcome { overflow: hidden; justify-content: center; }
 .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 /* Grid background on content */

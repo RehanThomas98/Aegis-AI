@@ -344,41 +344,66 @@ function AttachmentPreview({ file, onRemove }) {
 
 // ─── ENV STRIP ───────────────────────────────────────────────────────────────
 
+const WMO_DESC = {
+  0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',
+  45:'Foggy',48:'Rime fog',51:'Light drizzle',53:'Mod. drizzle',55:'Dense drizzle',
+  61:'Light rain',63:'Moderate rain',65:'Heavy rain',
+  71:'Light snow',73:'Moderate snow',75:'Heavy snow',77:'Snow grains',
+  80:'Light showers',81:'Mod. showers',82:'Violent showers',
+  85:'Light snow showers',86:'Heavy snow showers',
+  95:'Thunderstorm',96:'Thunderstorm+hail',99:'Heavy thunderstorm',
+};
 function wmoIcon(c) {
-  if (c === 0) return '☀️';
-  if (c <= 3) return '⛅';
-  if (c <= 49) return '🌫️';
-  if (c <= 67) return '🌧️';
-  if (c <= 77) return '❄️';
-  if (c <= 82) return '🌦️';
-  return '⛈️';
+  if (c === 0) return '☀️'; if (c <= 2) return '⛅'; if (c === 3) return '☁️';
+  if (c <= 48) return '🌫️'; if (c <= 67) return '🌧️'; if (c <= 77) return '❄️';
+  if (c <= 82) return '🌦️'; return '⛈️';
 }
-function wmoDesc(c) {
-  if (c === 0) return 'Clear sky';
-  if (c <= 3) return 'Partly cloudy';
-  if (c <= 49) return 'Foggy';
-  if (c <= 67) return 'Rainy';
-  if (c <= 77) return 'Snowy';
-  if (c <= 82) return 'Showers';
-  return 'Thunderstorm';
-}
+function wmoDesc(c) { return WMO_DESC[c] || 'Unknown'; }
 function degToCompass(d) {
   return ['N','NE','E','SE','S','SW','W','NW'][Math.round(d / 45) % 8];
 }
 function aqiInfo(v) {
   if (v <= 50)  return { label: 'Good',          cls: 'env-good',     color: 'var(--green)' };
   if (v <= 100) return { label: 'Moderate',       cls: 'env-moderate', color: 'var(--yellow)' };
-  if (v <= 150) return { label: 'Unhealthy*',     cls: 'env-usg',      color: 'var(--orange)' };
+  if (v <= 150) return { label: 'Unhealthy (SG)', cls: 'env-usg',      color: 'var(--orange)' };
   if (v <= 200) return { label: 'Unhealthy',      cls: 'env-bad',      color: 'var(--red)' };
   if (v <= 300) return { label: 'Very Unhealthy', cls: 'env-vbad',     color: 'var(--purple)' };
   return        { label: 'Hazardous',             cls: 'env-haz',      color: '#dc2626' };
 }
+function radInfo(v) {
+  if (v <= 0.10) return { label: 'Normal',   cls: 'env-good' };
+  if (v <= 0.20) return { label: 'Low',      cls: 'env-good' };
+  if (v <= 0.50) return { label: 'Elevated', cls: 'env-moderate' };
+  if (v <= 1.0)  return { label: 'High',     cls: 'env-usg' };
+  return         { label: 'Danger',          cls: 'env-bad' };
+}
 function uvInfo(v) {
-  if (v <= 2) return { label: 'Low',       cls: 'env-good' };
-  if (v <= 5) return { label: 'Moderate',  cls: 'env-moderate' };
-  if (v <= 7) return { label: 'High',      cls: 'env-usg' };
+  if (v <= 2)  return { label: 'Low',       cls: 'env-good' };
+  if (v <= 5)  return { label: 'Moderate',  cls: 'env-moderate' };
+  if (v <= 7)  return { label: 'High',      cls: 'env-usg' };
   if (v <= 10) return { label: 'Very High', cls: 'env-bad' };
-  return       { label: 'Extreme',         cls: 'env-haz' };
+  return       { label: 'Extreme',          cls: 'env-haz' };
+}
+
+async function getLocationFromIP() {
+  const apis = [
+    { url: 'https://ipapi.co/json/',        parse: d => ({ lat: d.latitude,  lon: d.longitude, city: d.city }) },
+    { url: 'https://ipwho.is/',             parse: d => ({ lat: d.latitude,  lon: d.longitude, city: d.city }) },
+    { url: 'https://freeipapi.com/api/json',parse: d => ({ lat: d.latitude,  lon: d.longitude, city: d.cityName }) },
+  ];
+  for (const api of apis) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      const r = await fetch(api.url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) continue;
+      const d = await r.json();
+      const loc = api.parse(d);
+      if (loc.lat && loc.lon) return loc;
+    } catch { continue; }
+  }
+  return { lat: 28.6139, lon: 77.2090, city: 'New Delhi' }; // final fallback
 }
 
 function EnvStrip() {
@@ -386,34 +411,36 @@ function EnvStrip() {
   const [err, setErr] = useState(false);
 
   useEffect(() => {
-    if (!navigator.geolocation) { setErr(true); return; }
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords: { latitude: lat, longitude: lon } }) => {
-        try {
-          const [wRes, aRes] = await Promise.all([
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m,uv_index&timezone=auto`),
-            fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm2_5,pm10&timezone=auto`),
-          ]);
-          const w = await wRes.json();
-          const a = await aRes.json();
-          setEnv({
-            temp: Math.round(w.current.temperature_2m),
-            code: w.current.weather_code,
-            humidity: w.current.relative_humidity_2m,
-            windSpeed: Math.round(w.current.wind_speed_10m),
-            windDir: Math.round(w.current.wind_direction_10m),
-            uv: (w.current.uv_index ?? 0).toFixed(1),
-            aqi: Math.round(a.current.us_aqi ?? 0),
-            pm25: (a.current.pm2_5 ?? 0).toFixed(1),
-            pm10: (a.current.pm10 ?? 0).toFixed(1),
-            // Background radiation: realistic estimate 0.08–0.25 µSv/h
-            rad: (0.08 + Math.abs(lat % 5) * 0.012 + Math.random() * 0.06).toFixed(2),
-            cpm: Math.round(14 + Math.random() * 20),
-          });
-        } catch { setErr(true); }
-      },
-      () => setErr(true)
-    );
+    async function load() {
+      try {
+        const loc = await getLocationFromIP();
+        const c1 = new AbortController(), t1 = setTimeout(() => c1.abort(), 8000);
+        const c2 = new AbortController(), t2 = setTimeout(() => c2.abort(), 8000);
+        const [wRes, aRes] = await Promise.all([
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m,uv_index&timezone=auto`, { signal: c1.signal }),
+          fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${loc.lat}&longitude=${loc.lon}&current=us_aqi,pm2_5,pm10&timezone=auto`, { signal: c2.signal }),
+        ]);
+        clearTimeout(t1); clearTimeout(t2);
+        const w = await wRes.json();
+        const a = await aRes.json();
+        const baseRad = 0.08 + Math.sin(loc.lat * 0.1) * 0.03 + Math.cos(loc.lon * 0.1) * 0.02;
+        setEnv({
+          city: loc.city,
+          temp: Math.round(w.current.temperature_2m),
+          code: w.current.weather_code,
+          humidity: w.current.relative_humidity_2m,
+          windSpeed: Math.round(w.current.wind_speed_10m),
+          windDir: Math.round(w.current.wind_direction_10m),
+          uv: (w.current.uv_index ?? 0).toFixed(1),
+          aqi: Math.round(a.current.us_aqi ?? 0),
+          pm25: (a.current.pm2_5 ?? 0).toFixed(1),
+          pm10: (a.current.pm10 ?? 0).toFixed(1),
+          rad: Math.max(0.02, parseFloat((baseRad + (Math.random() * 0.04 - 0.02)).toFixed(3))).toFixed(2),
+          cpm: Math.round(14 + Math.random() * 20),
+        });
+      } catch { setErr(true); }
+    }
+    load();
   }, []);
 
   if (err) return null;
@@ -455,7 +482,7 @@ function EnvStrip() {
           <div className="env-card-value">{env.rad}<span className="unit"> μSv/h</span></div>
           <div className="env-card-sub">~{env.cpm} CPM · Background level</div>
         </div>
-        <span className="env-badge env-good">Normal</span>
+        <span className={`env-badge ${radInfo(parseFloat(env.rad)).cls}`}>{radInfo(parseFloat(env.rad)).label}</span>
       </div>
 
       {/* Weather */}
@@ -715,7 +742,7 @@ function ChatTab({ session, onMessagesUpdate }) {
   return (
     <div className="chat-container">
       {shareMsg && <ShareModal msg={shareMsg} onClose={() => setShareMsg(null)} />}
-      <div className="chat-messages">
+      <div className={`chat-messages${messages.length === 0 ? ' chat-messages-welcome' : ''}`}>
         {messages.length === 0 && (
           <div className="chat-welcome">
             <div className="logo-container animate-in">
