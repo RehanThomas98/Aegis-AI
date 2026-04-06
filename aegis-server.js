@@ -716,6 +716,41 @@ app.post('/api/agent/ask', async (req, res) => {
   }
 });
 
+// Generates a concise 3-word crisis label for a conversation title
+app.post('/api/rename', async (req, res) => {
+  const { firstMessage, firstResponse } = req.body;
+  if (!firstMessage) return res.json({ title: 'Crisis Situation' });
+  try {
+    const msgs = [
+      { role: 'system', content: 'Generate a concise 3-4 word title for a crisis conversation. Examples: "Chennai Flood Evacuation", "Nuclear Shelter Protocol", "Grid Failure Survival". Return ONLY the title, no quotes, no punctuation.' },
+      { role: 'user', content: `User said: "${firstMessage.slice(0, 200)}"\nAEGIS responded about: "${(firstResponse || '').slice(0, 200)}"` },
+    ];
+    const title = (await callGroqFast(msgs, 20)).trim().replace(/^["']|["']$/g, '');
+    res.json({ title: title || 'Crisis Situation' });
+  } catch {
+    res.json({ title: firstMessage.slice(0, 30) || 'Crisis Situation' });
+  }
+});
+
+// Generates a structured situation report (SITREP) from the full conversation
+app.post('/api/sitrep', async (req, res) => {
+  const { messages } = req.body;
+  if (!messages || !messages.length) return res.json({ sitrep: null });
+  const context = messages.slice(-10).map(m =>
+    m.role === 'user' ? `User: ${m.text || ''}` : m.role === 'assistant' ? `AEGIS: ${(m.text || '').slice(0, 400)}` : null
+  ).filter(Boolean).join('\n\n');
+  try {
+    const prompt = [
+      { role: 'system', content: 'You are a crisis SITREP generator. Generate a concise 5-line Situation Report formatted exactly as:\nWHO: [who is affected and their status]\nWHAT: [what crisis is happening]\nWHERE: [location if mentioned, else "Location not specified"]\nSTATUS: [current situation and immediate threats]\nNEEDS: [top 3 immediate needs or actions]\n\nBe concise — each line max 20 words. No extra text.' },
+      { role: 'user', content: context },
+    ];
+    const raw = await callAI(prompt, 200);
+    res.json({ sitrep: raw.trim() });
+  } catch {
+    res.status(500).json({ sitrep: null, error: 'Failed to generate SITREP' });
+  }
+});
+
 // ── Static frontend (production) ─────────────────────────────────────────────
 // Serves the Vite build output. In development, Vite runs separately on its own port.
 

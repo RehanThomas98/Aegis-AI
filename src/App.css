@@ -662,16 +662,72 @@ body {
   display: flex;
   align-items: center;
   overflow-x: auto;
+  overflow-y: hidden;
   flex-shrink: 0;
   height: 55px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   scrollbar-width: none;
   transition: background var(--transition), border var(--transition);
+  position: relative;
+  z-index: 10;
 }
 
 .env-strip::-webkit-scrollbar {
   display: none;
+}
+
+/* ── ENV COLLAPSE BAR ───────────────────────────────────────────────────── */
+.env-collapse-bar {
+  position: relative;
+  height: 14px;
+  width: 40px;
+  background: transparent;
+}
+
+.env-collapse-btn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.15s, background 0.15s;
+  padding: 0;
+}
+
+.env-collapse-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.env-collapse-arrow {
+  transition: transform 0.3s ease;
+}
+
+/* ── ENV STRIP HIDDEN/VISIBLE ───────────────────────────────────────────── */
+.env-strip-hidden {
+  max-height: 0;
+  opacity: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
+}
+
+.env-strip:not(.env-strip-hidden) {
+  max-height: 55px;
+  opacity: 1;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
 }
 
 .env-strip-loading {
@@ -945,7 +1001,7 @@ body {
 }
 
 .chat-messages-welcome {
-  overflow: hidden;
+  overflow-y: hidden;
   justify-content: center;
 }
 
@@ -975,9 +1031,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0;
-  padding: 3rem 2rem 1.5rem;
+  padding: 1rem 2rem 1rem;
   text-align: center;
-  flex: 1;
+  width: 100%;
   position: relative;
   z-index: 1;
   animation: fadeUp 0.8s ease-out;
@@ -998,18 +1054,16 @@ body {
 /* Agent node logo ring */
 .logo-container {
   position: relative;
-  width: 180px;
-  height: 180px;
-  margin: 0 auto 24px;
+  width: 280px;
+  height: 280px;
+  margin: 0 auto 12px;
 }
 
 .logo-shield {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90px;
-  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
 }
 
 .connection-lines {
@@ -1020,13 +1074,13 @@ body {
 
 .agent-node {
   position: absolute;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px;
   border: 1.5px solid;
   transition: all 0.4s ease;
   cursor: default;
@@ -1081,7 +1135,7 @@ body {
 }
 
 .node-resource .agent-label {
-  left: 46px;
+  left: 54px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--green);
@@ -1115,7 +1169,7 @@ body {
 }
 
 .node-evac .agent-label {
-  right: 46px;
+  right: 54px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--purple);
@@ -1138,7 +1192,7 @@ body {
   font-weight: 700;
   letter-spacing: -0.5px;
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .chat-welcome h2 span {
@@ -1146,11 +1200,11 @@ body {
 }
 
 .chat-welcome>p {
-  font-size: 15px;
+  font-size: 13.5px;
   color: var(--text-secondary);
-  line-height: 1.7;
+  line-height: 1.6;
   max-width: 480px;
-  margin: 0 auto 28px;
+  margin: 0 auto 16px;
 }
 
 /* Scenario quick-pick cards in welcome */
@@ -1167,13 +1221,13 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 14px 12px;
+  padding: 10px 10px;
   cursor: pointer;
   transition: all var(--transition);
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   position: relative;
   overflow: hidden;
 }
@@ -1338,6 +1392,80 @@ body {
   background: var(--red);
   color: #fff;
 }
+
+/* ── SCAN ENVIRONMENT BANNER ────────────────────────────────────────────── */
+.scan-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.65rem 1.5rem;
+  background: linear-gradient(135deg, var(--accent-dim), transparent 70%);
+  border-bottom: 1px solid var(--border);
+  animation: slideDown 0.3s ease;
+  transition: opacity 0.4s ease, max-height 0.4s ease;
+}
+
+.scan-banner-fade {
+  opacity: 0;
+  max-height: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
+.scan-banner-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+.scan-banner-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.scan-banner-text strong { color: #0ea5e9; }
+
+.scan-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.scan-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  background: #0ea5e9;
+  color: #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.scan-banner-btn:hover { opacity: 0.88; }
+.scan-banner-btn:disabled { opacity: 0.6; cursor: default; }
+
+.scan-banner-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid rgba(34,211,238,0.3);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+.scan-banner-dismiss:hover { border-color: #0ea5e9; color: #0ea5e9; }
 
 /* ── REAL-TIME ALERT BANNER ─────────────────────────────────────────────── */
 .alert-banner {
@@ -3131,3 +3259,89 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── ENV ALERT BUBBLE ────────────────────────────────────────────────────────── */
+.env-alert-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 16px;
+  padding: 10px 14px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  color: var(--red);
+  animation: fadeIn 0.3s ease;
+}
+.env-alert-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.env-alert-content { flex: 1; }
+.env-alert-content p { margin-bottom: 2px; line-height: 1.4; }
+.env-alert-close { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px; display: flex; align-items: center; flex-shrink: 0; }
+.env-alert-close:hover { color: var(--red); }
+
+/* Flashing border on env strip when alert threshold crossed */
+.env-strip-alert {
+  animation: envAlertPulse 1s ease-in-out 3;
+}
+@keyframes envAlertPulse {
+  0%, 100% { border-color: var(--border); }
+  50% { border-color: rgba(248, 113, 113, 0.6); box-shadow: 0 0 12px rgba(248, 113, 113, 0.3); }
+}
+
+/* ── QUICK SHARE ────────────────────────────────────────────────────────────── */
+.quickshare-preview {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  margin: 12px 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── SITREP MODAL ────────────────────────────────────────────────────────────── */
+.sitrep-modal { min-width: 380px; max-width: 520px; }
+.sitrep-content {
+  padding: 4px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sitrep-line {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.sitrep-label {
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 2px 6px;
+  background: var(--accent-dim);
+  border-radius: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+.sitrep-value { color: var(--text-primary); line-height: 1.5; }
+
+/* ── VOICE INPUT ────────────────────────────────────────────────────────────── */
+.voice-active {
+  color: var(--red) !important;
+  background: var(--red-dim) !important;
+  animation: voicePulse 1s ease-in-out infinite;
+}
+@keyframes voicePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── SITREP BUTTON ────────────────────────────────────────────────────────────── */
+.sitrep-btn { color: var(--accent); }

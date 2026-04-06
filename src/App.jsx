@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, Sun, Moon, Send, LogIn, LogOut,
   Settings, MessageSquare, LayoutGrid, ChevronDown, ChevronUp, Loader2,
-  Copy, Check, Share2, X, Download, Paperclip, FileText, Image, Video, File, RefreshCw, Menu, Printer
+  Copy, Check, Share2, X, Download, Paperclip, FileText, Image, Video, File, RefreshCw, Menu, Printer,
+  Mic, MicOff
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
@@ -109,14 +110,19 @@ function getDateGroup(iso) {
 }
 
 function groupSessions(sessions) {
+  const pinned = sessions.filter(s => s.pinned);
+  const unpinned = sessions.filter(s => !s.pinned);
   const order = ['Today', 'Yesterday', 'This Week', 'Earlier'];
   const groups = {};
-  for (const s of sessions) {
+  for (const s of unpinned) {
     const g = getDateGroup(s.createdAt);
     if (!groups[g]) groups[g] = [];
     groups[g].push(s);
   }
-  return order.filter(g => groups[g]).map(g => ({ label: g, items: groups[g] }));
+  const result = [];
+  if (pinned.length > 0) result.push({ label: '📌 Pinned', items: pinned });
+  result.push(...order.filter(g => groups[g]).map(g => ({ label: g, items: groups[g] })));
+  return result;
 }
 const loadTheme = () => localStorage.getItem('aegis_theme') || 'dark';
 
@@ -358,6 +364,40 @@ function AttachmentPreview({ file, onRemove }) {
   );
 }
 
+// ─── SCAN ENVIRONMENT BANNER ─────────────────────────────────────────────────
+
+function ScanBanner({ onScan, onDismiss }) {
+  const [scanning, setScanning] = useState(false);
+  const [fading, setFading] = useState(false);
+
+  const dismiss = () => {
+    setFading(true);
+    setTimeout(onDismiss, 400);
+  };
+
+  const handleScan = async () => {
+    setScanning(true);
+    await onScan();
+    setScanning(false);
+    dismiss();
+  };
+
+  return (
+    <div className={`scan-banner${fading ? ' scan-banner-fade' : ''}`}>
+      <span className="scan-banner-icon">🛰️</span>
+      <p className="scan-banner-text">
+        <strong>AEGIS</strong> can scan your surroundings — check air quality, weather, radiation &amp; more
+      </p>
+      <div className="scan-banner-actions">
+        <button className="scan-banner-btn" onClick={handleScan} disabled={scanning}>
+          {scanning ? <><Loader2 size={13} className="spin" /> Scanning…</> : 'Scan Environment'}
+        </button>
+        <button className="scan-banner-dismiss" onClick={dismiss}>Dismiss</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── ENV STRIP ───────────────────────────────────────────────────────────────
 
 const WMO_DESC = {
@@ -435,6 +475,7 @@ async function getLocationFromIP() {
         if (loc.country_code) localStorage.setItem('aegis_country', loc.country_code);
         localStorage.setItem('aegis_lat', String(loc.lat));
         localStorage.setItem('aegis_lon', String(loc.lon));
+        if (loc.city) localStorage.setItem('aegis_city', loc.city);
         return loc;
       }
     } catch { continue; }
@@ -442,13 +483,15 @@ async function getLocationFromIP() {
   return { lat: 28.6139, lon: 77.2090, city: 'New Delhi', country_code: 'IN' }; // final fallback
 }
 
-function EnvStrip() {
+function EnvStrip({ scanRef, visible, onAlert }) {
   const [env, setEnv] = useState(null);
   const [loc, setLoc] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [alerting, setAlerting] = useState(false);
   const locRef = useRef(null);
 
-  const fetchData = useCallback(async (location) => {
+  // notifyAlerts=true only when user explicitly refreshes or scans — not on auto-poll or initial load
+  const fetchData = useCallback(async (location, notifyAlerts = false) => {
     try {
       const c1 = new AbortController(), t1 = setTimeout(() => c1.abort(), 8000);
       const c2 = new AbortController(), t2 = setTimeout(() => c2.abort(), 8000);
@@ -460,21 +503,32 @@ function EnvStrip() {
       const w = await wRes.json();
       const a = await aRes.json();
       const baseRad = 0.08 + Math.sin(location.lat * 0.1) * 0.03 + Math.cos(location.lon * 0.1) * 0.02;
-      setEnv({
-        temp: Math.round(w.current.temperature_2m),
-        code: w.current.weather_code,
-        humidity: w.current.relative_humidity_2m,
-        windSpeed: Math.round(w.current.wind_speed_10m * 10) / 10,
-        windDir: Math.round(w.current.wind_direction_10m),
-        uv: (w.current.uv_index ?? 0).toFixed(1),
-        aqi: Math.round(a.current.us_aqi ?? 0),
-        pm25: (a.current.pm2_5 ?? 0).toFixed(1),
-        pm10: (a.current.pm10 ?? 0).toFixed(1),
-        rad: Math.max(0.02, parseFloat((baseRad + (Math.random() * 0.04 - 0.02)).toFixed(3))).toFixed(2),
-        cpm: Math.round(14 + Math.random() * 20),
-      });
+      const temp = Math.round(w.current.temperature_2m);
+      const code = w.current.weather_code;
+      const humidity = w.current.relative_humidity_2m;
+      const windSpeed = Math.round(w.current.wind_speed_10m * 10) / 10;
+      const windDir = Math.round(w.current.wind_direction_10m);
+      const uv = (w.current.uv_index ?? 0).toFixed(1);
+      const aqi = Math.round(a.current.us_aqi ?? 0);
+      const pm25 = (a.current.pm2_5 ?? 0).toFixed(1);
+      const pm10 = (a.current.pm10 ?? 0).toFixed(1);
+      const rad = Math.max(0.02, parseFloat((baseRad + (Math.random() * 0.04 - 0.02)).toFixed(3))).toFixed(2);
+      const cpm = Math.round(14 + Math.random() * 20);
+      setEnv({ temp, code, humidity, windSpeed, windDir, uv, aqi, pm25, pm10, rad, cpm });
+      localStorage.setItem('aegis_env_cache', JSON.stringify({ temp, code, aqi, rad, windSpeed, humidity, pm25 }));
+      if (notifyAlerts) {
+        const alerts = [];
+        const radVal = parseFloat(rad);
+        if (aqi > 150) alerts.push({ type: 'aqi', level: aqi > 200 ? 'very-unhealthy' : 'unhealthy', message: `Air quality is ${aqi > 200 ? 'Very Unhealthy' : 'Unhealthy'} (AQI ${aqi}) — avoid outdoor exposure.` });
+        if (radVal > 0.5) alerts.push({ type: 'radiation', level: 'danger', message: `Radiation elevated at ${radVal.toFixed(2)} μSv/h — stay indoors.` });
+        if (alerts.length > 0) {
+          setAlerting(true);
+          setTimeout(() => setAlerting(false), 8000);
+          if (onAlert) onAlert(alerts);
+        }
+      }
     } catch { /* silent — keep last data */ }
-  }, []);
+  }, [onAlert]);
 
   useEffect(() => {
     async function init() {
@@ -493,9 +547,14 @@ function EnvStrip() {
   const handleRefresh = async () => {
     if (!locRef.current || refreshing) return;
     setRefreshing(true);
-    await fetchData(locRef.current);
+    await fetchData(locRef.current, true); // notify alerts on explicit user refresh
     setRefreshing(false);
   };
+
+  // Expose refresh to parent via ref so the scan banner can trigger it
+  useEffect(() => {
+    if (scanRef) scanRef.current = handleRefresh;
+  }, [scanRef, handleRefresh]);
 
   if (!loc && !env) return (
     <div className="env-strip env-strip-loading">
@@ -512,7 +571,7 @@ function EnvStrip() {
   const tempColor = env.temp > 35 ? 'var(--red)' : env.temp > 25 ? 'var(--orange)' : env.temp < 5 ? 'var(--purple)' : 'var(--accent)';
 
   return (
-    <div className="env-strip">
+    <div className={`env-strip${visible ? '' : ' env-strip-hidden'}${alerting ? ' env-strip-alert' : ''}`}>
       <div className="env-strip-label"><span className="live-dot" /> LIVE</div>
 
       {/* Location */}
@@ -587,7 +646,7 @@ function EnvStrip() {
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDelete, theme, onTheme, user, onSignIn, onSignOut, onSettings }) {
+function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDelete, onPin, theme, onTheme, user, onSignIn, onSignOut, onSettings }) {
   const [editId, setEditId] = useState(null);
   const [editVal, setEditVal] = useState('');
   const [search, setSearch] = useState('');
@@ -640,6 +699,9 @@ function Sidebar({ isOpen, sessions, currentId, onSelect, onNew, onRename, onDel
                       <span className="session-time">{timeAgo(s.createdAt)}</span>
                     </div>
                     <div className="session-actions">
+                      <button className="icon-btn" title={s.pinned ? 'Unpin' : 'Pin'} onClick={e => { e.stopPropagation(); onPin(s.id); }}>
+                        {s.pinned ? '📌' : <span style={{fontSize:'11px',opacity:0.5}}>📌</span>}
+                      </button>
                       <button className="icon-btn" title="Rename" onClick={e => { e.stopPropagation(); setEditId(s.id); setEditVal(s.title); }}><Pencil size={12} /></button>
                       <button className="icon-btn danger" title="Delete" onClick={e => { e.stopPropagation(); onDelete(s.id); }}><Trash2 size={12} /></button>
                     </div>
@@ -992,10 +1054,12 @@ function ChatMessage({ msg, onShare, onRetry }) {
       </div>
     </div>
   );
+  const { threatLevel } = extractStats(msg.text);
+  const borderColor = threatLevel && THREAT_CONFIG[threatLevel] ? THREAT_CONFIG[threatLevel].color : null;
   return (
     <div className="chat-bubble assistant">
       <div className="chat-avatar aegis"><AegisAvatar /></div>
-      <div className="chat-bubble-content">
+      <div className="chat-bubble-content" style={borderColor ? { borderLeft: `3px solid ${borderColor}`, paddingLeft: '12px' } : {}}>
         <ResponseCards text={msg.text} />
         <div className="msg-actions">
           <button className="msg-action-btn" onClick={handleCopy} title="Copy response">
@@ -1014,18 +1078,159 @@ function ChatMessage({ msg, onShare, onRetry }) {
   );
 }
 
+// ─── ENV ALERT BUBBLE ────────────────────────────────────────────────────────
+
+function EnvAlertBubble({ alerts, onDismiss }) {
+  if (!alerts.length) return null;
+  return (
+    <div className="env-alert-bubble">
+      <span className="env-alert-icon">⚠️</span>
+      <div className="env-alert-content">
+        {alerts.map((a, i) => <p key={i}>{a.message}</p>)}
+      </div>
+      <button className="env-alert-close" onClick={onDismiss}><X size={12}/></button>
+    </div>
+  );
+}
+
+// ─── QUICK SHARE MODAL ───────────────────────────────────────────────────────
+
+function QuickShareModal({ session, onClose }) {
+  const loc = { city: localStorage.getItem('aegis_city') || 'Unknown', lat: localStorage.getItem('aegis_lat'), lon: localStorage.getItem('aegis_lon') };
+  let envText = '';
+  try {
+    const c = JSON.parse(localStorage.getItem('aegis_env_cache') || '{}');
+    if (c.aqi) envText = `Air: AQI ${c.aqi} | Temp: ${c.temp}°C | Radiation: ${c.rad} μSv/h`;
+  } catch {}
+
+  const lastResponse = session?.messages?.filter(m => m.role === 'assistant').slice(-1)[0]?.text || '';
+  const actionMatch = lastResponse.match(/\*\*([^*]+)\*\*/);
+  const topAction = actionMatch ? actionMatch[1] : 'Follow AEGIS crisis protocol';
+
+  const message = `🛡️ AEGIS CRISIS UPDATE\n📍 Location: ${loc.city} (${loc.lat}, ${loc.lon})\n🌍 Environment: ${envText || 'Data unavailable'}\n⚡ Priority: ${topAction}\n\nSent via AEGIS Crisis Coordinator`;
+
+  const [copied, setCopied] = useState(false);
+
+  const copyMsg = () => { navigator.clipboard.writeText(message).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); };
+  const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  const sms = () => window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
+
+  return (
+    <div className="share-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="share-modal">
+        <div className="share-modal-header">
+          <h3>📤 Quick Share Status</h3>
+          <button className="icon-btn" onClick={onClose}><X size={16}/></button>
+        </div>
+        <div className="quickshare-preview">{message}</div>
+        <div className="share-modal-actions">
+          <button className="btn-primary" onClick={whatsapp} style={{background:'#25D366',color:'#fff',border:'none'}}>📱 WhatsApp</button>
+          <button className="btn-primary" onClick={sms} style={{background:'var(--accent-dim)',color:'var(--accent)',border:'1px solid var(--border-active)'}}>💬 SMS</button>
+          <button className="btn-primary" onClick={copyMsg} style={{background:'var(--bg-tertiary)',color:'var(--text-primary)',border:'1px solid var(--border)',display:'flex',alignItems:'center',gap:'0.3rem'}}>
+            {copied ? <><Check size={13}/> Copied!</> : <><Copy size={13}/> Copy</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SITREP MODAL ────────────────────────────────────────────────────────────
+
+function SitrepModal({ session, onClose }) {
+  const [sitrep, setSitrep] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const msgs = session?.messages?.filter(m => m.role !== 'error') || [];
+    fetch('/api/sitrep', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: msgs }),
+    })
+    .then(r => r.json())
+    .then(d => { setSitrep(d.sitrep); setLoading(false); })
+    .catch(() => setLoading(false));
+  }, []);
+
+  const copy = () => { if (sitrep) navigator.clipboard.writeText(sitrep).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); };
+
+  return (
+    <div className="share-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="share-modal sitrep-modal">
+        <div className="share-modal-header">
+          <h3>📋 Situation Report (SITREP)</h3>
+          <button className="icon-btn" onClick={onClose}><X size={16}/></button>
+        </div>
+        {loading ? (
+          <div style={{padding:'2rem',textAlign:'center'}}><Loader2 size={20} className="spin" style={{color:'var(--accent)'}}/><p style={{marginTop:'0.5rem',color:'var(--text-secondary)',fontSize:'13px'}}>Generating SITREP…</p></div>
+        ) : sitrep ? (
+          <>
+            <div className="sitrep-content">
+              {sitrep.split('\n').map((line, i) => {
+                const colonIdx = line.indexOf(':');
+                if (colonIdx === -1) return <p key={i}>{line}</p>;
+                return (
+                  <div key={i} className="sitrep-line">
+                    <span className="sitrep-label">{line.slice(0, colonIdx)}</span>
+                    <span className="sitrep-value">{line.slice(colonIdx + 1).trim()}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="share-modal-actions">
+              <button className="btn-primary" onClick={copy} style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
+                {copied ? <><Check size={13}/> Copied!</> : <><Copy size={13}/> Copy SITREP</>}
+              </button>
+            </div>
+          </>
+        ) : (
+          <p style={{padding:'1.5rem',color:'var(--text-secondary)',fontSize:'13px'}}>Unable to generate SITREP. Add more conversation context first.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── CHAT TAB ────────────────────────────────────────────────────────────────
 
-function ChatTab({ session, onMessagesUpdate, user }) {
+function ChatTab({ session, onMessagesUpdate, user, envAlerts, onDismissEnvAlerts, onRenameSession }) {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [shareMsg, setShareMsg] = useState(null);
   const [attachment, setAttachment] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
+  const [showQuickShare, setShowQuickShare] = useState(false);
+  const [showSitrep, setShowSitrep] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const messages = session?.messages || [];
+
+  const toggleVoice = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Voice input not supported in this browser.'); return; }
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.onresult = e => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+      setInput(prev => (prev ? prev + ' ' + transcript : transcript));
+      setTimeout(autoResize, 0);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  };
 
   const printConversation = () => {
     const title = session?.title || 'Crisis Plan';
@@ -1169,6 +1374,16 @@ ${body}
       const data = await res.json();
       onMessagesUpdate([...next, { role: 'assistant', text: data.finalPlan, timestamp: data.timestamp }]);
       fetchSuggestions(text, data.finalPlan);
+      if (baseMessages.length === 0) {
+        try {
+          const rRes = await fetch('/api/rename', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ firstMessage: text, firstResponse: data.finalPlan }),
+          });
+          const rData = await rRes.json();
+          if (rData.title && onRenameSession) onRenameSession(rData.title);
+        } catch {}
+      }
     } catch (e) {
       onMessagesUpdate([...next, { role: 'error', text: friendlyApiError(e.message), retryText: text }]);
     } finally { setLoading(false); }
@@ -1217,23 +1432,14 @@ ${body}
   return (
     <div className="chat-container">
       {shareMsg && <ShareModal msg={shareMsg} onClose={() => setShareMsg(null)} />}
+      {showQuickShare && <QuickShareModal session={session} onClose={() => setShowQuickShare(false)} />}
+      {showSitrep && <SitrepModal session={session} onClose={() => setShowSitrep(false)} />}
+      <EnvAlertBubble alerts={envAlerts || []} onDismiss={onDismissEnvAlerts} />
       <div className={`chat-messages${messages.length === 0 ? ' chat-messages-welcome' : ''}`}>
         {messages.length === 0 && (
           <div className="chat-welcome">
-            <div className="logo-container animate-in">
-              <svg className="connection-lines" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <line x1="90" y1="40" x2="90" y2="65" stroke="var(--red)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-                <line x1="140" y1="90" x2="115" y2="90" stroke="var(--green)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-                <line x1="90" y1="140" x2="90" y2="115" stroke="var(--yellow)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-                <line x1="40" y1="90" x2="65" y2="90" stroke="var(--purple)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-              </svg>
-              <div className="logo-shield">
-                <img src="/aegis_logo.svg" alt="AEGIS" style={{ width: '80px', height: '80px' }} />
-              </div>
-              <div className="agent-node node-assess">🔍<span className="agent-label">ASSESS</span></div>
-              <div className="agent-node node-resource">📦<span className="agent-label">RESOURCE</span></div>
-              <div className="agent-node node-comms">📡<span className="agent-label">COMMS</span></div>
-              <div className="agent-node node-evac">🚨<span className="agent-label">EVACUATE</span></div>
+            <div className="logo-shield animate-in">
+              <img src="/aegis_logo.svg" alt="AEGIS" style={{ width: '160px', height: '160px' }} />
             </div>
             <h2>AEGIS is Aware!</h2>
             <p>Describe your situation — I'll coordinate four specialized agents and give you a clear survival plan.</p>
@@ -1267,6 +1473,12 @@ ${body}
             <button className="export-btn" onClick={exportConversation} title="Export as .txt">
               <Download size={13} /> Export
             </button>
+            <button className="export-btn" onClick={() => setShowQuickShare(true)} title="Share your status">
+              <Share2 size={13} /> Share
+            </button>
+            <button className="export-btn sitrep-btn" onClick={() => setShowSitrep(true)} title="Generate Situation Report">
+              <FileText size={13} /> SITREP
+            </button>
           </div>
         )}
         {suggestions.length > 0 && (
@@ -1287,6 +1499,9 @@ ${body}
           <input ref={fileInputRef} type="file" accept={ACCEPTED_TYPES} style={{ display: 'none' }} onChange={handleFile} />
           <button className="attach-btn" onClick={() => fileInputRef.current.click()} title="Attach file" disabled={loading}>
             <Paperclip size={15} />
+          </button>
+          <button className={`attach-btn${listening ? ' voice-active' : ''}`} onClick={toggleVoice} title={listening ? 'Stop listening' : 'Voice input'} disabled={loading}>
+            {listening ? <MicOff size={15} /> : <Mic size={15} />}
           </button>
           <textarea ref={textareaRef} className="chat-input" rows={1}
             placeholder="Describe your crisis situation…"
@@ -1534,7 +1749,25 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showLogoutAnim, setShowLogoutAnim] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [apiStatus, setApiStatus] = useState(null); // null=checking, true=ok, false=down
+  const [apiStatus, setApiStatus] = useState(null);
+  const [showScanBanner, setShowScanBanner] = useState(false);
+  const [envVisible, setEnvVisible] = useState(false);
+  // Tracks whether the env strip has ever been activated this session — once true, scan banner never returns
+  const [envActivated, setEnvActivated] = useState(false);
+  const [envAlerts, setEnvAlerts] = useState([]);
+  const scanRef = useRef(null);
+
+  // Mark env as activated and hide scan banner when strip is shown
+  useEffect(() => {
+    if (envVisible) { setEnvActivated(true); setShowScanBanner(false); }
+  }, [envVisible]);
+
+  // Show the scan banner periodically — but never once env strip has been activated
+  useEffect(() => {
+    const first = setTimeout(() => { if (!envActivated) setShowScanBanner(true); }, 30000);
+    const repeat = setInterval(() => { if (!envActivated) setShowScanBanner(true); }, 10 * 60 * 1000);
+    return () => { clearTimeout(first); clearInterval(repeat); };
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => setUser(u || null));
@@ -1573,8 +1806,13 @@ export default function App() {
 
   const updateMessages = useCallback((msgs) => {
     if (!currentId) return;
-    const title = msgs.find(m => m.role === 'user')?.text?.slice(0, 42) || 'New conversation';
-    persist(sessions.map(s => s.id === currentId ? { ...s, messages: msgs, title } : s));
+    persist(sessions.map(s => {
+      if (s.id !== currentId) return s;
+      const autoTitle = msgs.find(m => m.role === 'user')?.text?.slice(0, 42) || 'New conversation';
+      // Don't overwrite a title that was already auto-renamed via /api/rename
+      const title = s._renamed ? s.title : autoTitle;
+      return { ...s, messages: msgs, title };
+    }));
   }, [currentId, sessions]);
 
   useEffect(() => { if (sessions.length === 0) newChat(); }, []);
@@ -1602,6 +1840,7 @@ export default function App() {
         onNew={() => { newChat(); setSidebarOpen(false); }}
         onRename={(id, title) => persist(sessions.map(s => s.id === id ? { ...s, title } : s))}
         onDelete={id => { const n = sessions.filter(s => s.id !== id); persist(n); if (currentId === id) setCurrentId(n[0]?.id || null); }}
+        onPin={id => persist(sessions.map(s => s.id === id ? { ...s, pinned: !s.pinned } : s))}
         theme={theme} onTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         user={user}
         onSignIn={() => setShowAuth(true)}
@@ -1629,12 +1868,40 @@ export default function App() {
             </span>
           </div>
         </header>
-        <EnvStrip />
+        {showScanBanner && !envActivated && (
+          <ScanBanner
+            onScan={async () => { setEnvVisible(true); await scanRef.current?.(); }}
+            onDismiss={() => setShowScanBanner(false)}
+          />
+        )}
+        <EnvStrip scanRef={scanRef} visible={envVisible} onAlert={alerts => setEnvAlerts(prev => { const ids = new Set(prev.map(a => a.type)); return [...prev, ...alerts.filter(a => !ids.has(a.type))]; })} />
+        {(envVisible || (!envVisible && scanRef.current)) && (
+          <div className="env-collapse-bar">
+            <button
+              className="env-collapse-btn"
+              onClick={() => setEnvVisible(v => !v)}
+              title={envVisible ? 'Hide environment panel' : 'Show environment panel'}
+            >
+              {envVisible
+                ? <ChevronUp size={12} className="env-collapse-arrow" />
+                : <ChevronDown size={12} className="env-collapse-arrow" />
+              }
+            </button>
+          </div>
+        )}
         <AlertBanner />
 
         <div className="content">
           {tab === 'chat'
-            ? <ChatTab key={currentId} session={currentSession} onMessagesUpdate={updateMessages} user={user} />
+            ? <ChatTab
+                key={currentId}
+                session={currentSession}
+                onMessagesUpdate={updateMessages}
+                user={user}
+                envAlerts={envAlerts}
+                onDismissEnvAlerts={() => setEnvAlerts([])}
+                onRenameSession={title => persist(sessions.map(s => s.id === currentId ? { ...s, title, _renamed: true } : s))}
+              />
             : <ScenariosTab />}
         </div>
       </div>
