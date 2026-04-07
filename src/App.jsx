@@ -1806,14 +1806,17 @@ export default function App() {
 
   const updateMessages = useCallback((msgs) => {
     if (!currentId) return;
-    persist(sessions.map(s => {
-      if (s.id !== currentId) return s;
-      const autoTitle = msgs.find(m => m.role === 'user')?.text?.slice(0, 42) || 'New conversation';
-      // Don't overwrite a title that was already auto-renamed via /api/rename
-      const title = s._renamed ? s.title : autoTitle;
-      return { ...s, messages: msgs, title };
-    }));
-  }, [currentId, sessions]);
+    setSessions(prev => {
+      const next = prev.map(s => {
+        if (s.id !== currentId) return s;
+        const autoTitle = msgs.find(m => m.role === 'user')?.text?.slice(0, 42) || 'New conversation';
+        const title = s._renamed ? s.title : autoTitle;
+        return { ...s, messages: msgs, title };
+      });
+      saveSessions(next);
+      return next;
+    });
+  }, [currentId]);
 
   useEffect(() => { if (sessions.length === 0) newChat(); }, []);
 
@@ -1900,7 +1903,7 @@ export default function App() {
                 user={user}
                 envAlerts={envAlerts}
                 onDismissEnvAlerts={() => setEnvAlerts([])}
-                onRenameSession={title => persist(sessions.map(s => s.id === currentId ? { ...s, title, _renamed: true } : s))}
+                onRenameSession={title => setSessions(prev => { const next = prev.map(s => s.id === currentId ? { ...s, title, _renamed: true } : s); saveSessions(next); return next; })}
               />
             : <ScenariosTab />}
         </div>
