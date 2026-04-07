@@ -456,7 +456,48 @@ function MiniRing({ value, max, color, label }) {
   );
 }
 
+// Reverse-geocode lat/lon → city + country using OpenStreetMap Nominatim (free, no key)
+async function reverseGeocode(lat, lon) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+      { signal: ctrl.signal, headers: { 'Accept-Language': 'en' } }
+    );
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const a = d.address || {};
+    // Pick most specific available place name: suburb > city > town > county
+    const city = a.suburb || a.city || a.town || a.village || a.county || a.state || 'Unknown';
+    const country_code = (a.country_code || '').toUpperCase();
+    return { city, country_code };
+  } catch { return null; }
+}
+
+// Try browser GPS first (most accurate), fall back to IP geolocation
 async function getLocationFromIP() {
+  // 1. Browser Geolocation API — GPS/WiFi, accurate to street level
+  if (navigator.geolocation) {
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 300000 })
+      );
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const geo = await reverseGeocode(lat, lon);
+      const city = geo?.city || 'Unknown';
+      const country_code = geo?.country_code || 'IN';
+      localStorage.setItem('aegis_lat', String(lat));
+      localStorage.setItem('aegis_lon', String(lon));
+      localStorage.setItem('aegis_city', city);
+      localStorage.setItem('aegis_country', country_code);
+      return { lat, lon, city, country_code };
+    } catch { /* permission denied or timeout — fall through to IP */ }
+  }
+
+  // 2. IP geolocation fallback
   const apis = [
     { url: 'https://ipapi.co/json/', parse: d => ({ lat: d.latitude, lon: d.longitude, city: d.city, country_code: d.country_code }) },
     { url: 'https://ipwho.is/', parse: d => ({ lat: d.latitude, lon: d.longitude, city: d.city, country_code: d.country_code }) },
