@@ -1875,7 +1875,7 @@ export default function App() {
           />
         )}
         <EnvStrip scanRef={scanRef} visible={envVisible} onAlert={alerts => setEnvAlerts(prev => { const ids = new Set(prev.map(a => a.type)); return [...prev, ...alerts.filter(a => !ids.has(a.type))]; })} />
-        {(envVisible || (!envVisible && scanRef.current)) && (
+        {envActivated && (
           <div className="env-collapse-bar">
             <button
               className="env-collapse-btn"

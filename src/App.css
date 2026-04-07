@@ -692,7 +692,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 33px;
   height: 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -1432,7 +1432,10 @@ body {
   overflow: hidden;
 }
 
-.scan-banner-icon { font-size: 1.1rem; flex-shrink: 0; }
+.scan-banner-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
 
 .scan-banner-text {
   font-size: 0.8rem;
@@ -1441,7 +1444,9 @@ body {
   white-space: nowrap;
 }
 
-.scan-banner-text strong { color: #0ea5e9; }
+.scan-banner-text strong {
+  color: #0ea5e9;
+}
 
 .scan-banner-actions {
   display: flex;
@@ -1465,8 +1470,15 @@ body {
   white-space: nowrap;
   transition: opacity 0.15s;
 }
-.scan-banner-btn:hover { opacity: 0.88; }
-.scan-banner-btn:disabled { opacity: 0.6; cursor: default; }
+
+.scan-banner-btn:hover {
+  opacity: 0.88;
+}
+
+.scan-banner-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 
 .scan-banner-dismiss {
   display: inline-flex;
@@ -1476,14 +1488,18 @@ body {
   font-size: 0.75rem;
   font-weight: 500;
   border-radius: 999px;
-  border: 1px solid rgba(34,211,238,0.3);
+  border: 1px solid rgba(34, 211, 238, 0.3);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s;
 }
-.scan-banner-dismiss:hover { border-color: #0ea5e9; color: #0ea5e9; }
+
+.scan-banner-dismiss:hover {
+  border-color: #0ea5e9;
+  color: #0ea5e9;
+}
 
 /* ── REAL-TIME ALERT BANNER ─────────────────────────────────────────────── */
 .alert-banner {
@@ -1497,29 +1513,73 @@ body {
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.alert-banner--red    { background: rgba(239,68,68,0.10);  border-left: 3px solid #ef4444; }
-.alert-banner--orange { background: rgba(249,115,22,0.08); border-left: 3px solid #f97316; }
-.alert-banner--yellow { background: rgba(245,158,11,0.07); border-left: 3px solid #f59e0b; }
+.alert-banner--red {
+  background: rgba(239, 68, 68, 0.10);
+  border-left: 3px solid #ef4444;
+}
+
+.alert-banner--orange {
+  background: rgba(249, 115, 22, 0.08);
+  border-left: 3px solid #f97316;
+}
+
+.alert-banner--yellow {
+  background: rgba(245, 158, 11, 0.07);
+  border-left: 3px solid #f59e0b;
+}
 
 .alert-banner-dot {
-  width: 7px; height: 7px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 0.38rem;
   animation: dot-pulse 2s ease-in-out infinite;
 }
-.alert-banner--red    .alert-banner-dot { background: #ef4444 !important; box-shadow: 0 0 6px #ef4444 !important; }
-.alert-banner--orange .alert-banner-dot { background: #f97316 !important; box-shadow: 0 0 6px #f97316 !important; }
-.alert-banner--yellow .alert-banner-dot { background: #f59e0b !important; box-shadow: 0 0 6px #f59e0b !important; }
 
-.alert-banner-body { flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+.alert-banner--red .alert-banner-dot {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px #ef4444 !important;
+}
 
-.alert-item { display: flex; align-items: center; gap: 0.5rem; }
-.alert-item-icon { font-size: 0.9rem; flex-shrink: 0; }
+.alert-banner--orange .alert-banner-dot {
+  background: #f97316 !important;
+  box-shadow: 0 0 6px #f97316 !important;
+}
+
+.alert-banner--yellow .alert-banner-dot {
+  background: #f59e0b !important;
+  box-shadow: 0 0 6px #f59e0b !important;
+}
+
+.alert-banner-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alert-item-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
 
 .alert-item-text {
   flex: 1;
@@ -1537,22 +1597,45 @@ body {
   text-overflow: ellipsis;
 }
 
-.alert-item-detail { font-size: 0.7rem; color: var(--text-muted); }
+.alert-item-detail {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
 
 .alert-dismiss {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-muted); padding: 0.2rem; border-radius: 4px;
-  flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0.2rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
 }
-.alert-dismiss:hover { opacity: 1; }
+
+.alert-dismiss:hover {
+  opacity: 1;
+}
 
 .alert-expand {
-  background: none; border: 1px solid var(--border); border-radius: 999px;
-  padding: 0.15rem 0.6rem; font-size: 0.7rem; color: var(--text-muted);
-  cursor: pointer; white-space: nowrap; flex-shrink: 0; align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.alert-expand:hover { border-color: var(--accent); color: var(--accent); }
+
+.alert-expand:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* ── CHAT INPUT TOOLBAR (export button) ─────────────────────────────────── */
 .chat-input-toolbar {
@@ -3297,19 +3380,53 @@ body {
   color: var(--red);
   animation: fadeIn 0.3s ease;
 }
-.env-alert-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
-.env-alert-content { flex: 1; }
-.env-alert-content p { margin-bottom: 2px; line-height: 1.4; }
-.env-alert-close { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px; display: flex; align-items: center; flex-shrink: 0; }
-.env-alert-close:hover { color: var(--red); }
+
+.env-alert-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.env-alert-content {
+  flex: 1;
+}
+
+.env-alert-content p {
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+
+.env-alert-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.env-alert-close:hover {
+  color: var(--red);
+}
 
 /* Flashing border on env strip when alert threshold crossed */
 .env-strip-alert {
   animation: envAlertPulse 1s ease-in-out 3;
 }
+
 @keyframes envAlertPulse {
-  0%, 100% { border-color: var(--border); }
-  50% { border-color: rgba(248, 113, 113, 0.6); box-shadow: 0 0 12px rgba(248, 113, 113, 0.3); }
+
+  0%,
+  100% {
+    border-color: var(--border);
+  }
+
+  50% {
+    border-color: rgba(248, 113, 113, 0.6);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.3);
+  }
 }
 
 /* ── QUICK SHARE ────────────────────────────────────────────────────────────── */
@@ -3327,13 +3444,18 @@ body {
 }
 
 /* ── SITREP MODAL ────────────────────────────────────────────────────────────── */
-.sitrep-modal { min-width: 380px; max-width: 520px; }
+.sitrep-modal {
+  min-width: 380px;
+  max-width: 520px;
+}
+
 .sitrep-content {
   padding: 4px 0 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
 .sitrep-line {
   display: grid;
   grid-template-columns: 80px 1fr;
@@ -3341,6 +3463,7 @@ body {
   align-items: baseline;
   font-size: 13px;
 }
+
 .sitrep-label {
   font-weight: 700;
   font-size: 10px;
@@ -3353,7 +3476,11 @@ body {
   text-align: center;
   white-space: nowrap;
 }
-.sitrep-value { color: var(--text-primary); line-height: 1.5; }
+
+.sitrep-value {
+  color: var(--text-primary);
+  line-height: 1.5;
+}
 
 /* ── VOICE INPUT ────────────────────────────────────────────────────────────── */
 .voice-active {
@@ -3361,10 +3488,20 @@ body {
   background: var(--red-dim) !important;
   animation: voicePulse 1s ease-in-out infinite;
 }
+
 @keyframes voicePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* ── SITREP BUTTON ────────────────────────────────────────────────────────────── */
-.sitrep-btn { color: var(--accent); }
+.sitrep-btn {
+  color: var(--accent);
+}
