@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(mv meridian-styles.css AEGIS-styles.css)",
-      "Bash(mv meridian-server.js AEGIS-server.js)",
-      "Bash(mv meridian-app.jsx AEGIS-app.jsx)"
-    ]
-  }
-}
