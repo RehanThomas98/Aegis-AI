@@ -1413,17 +1413,21 @@ ${body}
       });
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
-      onMessagesUpdate([...next, { role: 'assistant', text: data.finalPlan, timestamp: data.timestamp }]);
+      const finalMsgs = [...next, { role: 'assistant', text: data.finalPlan, timestamp: data.timestamp }];
+      onMessagesUpdate(finalMsgs);
       fetchSuggestions(text, data.finalPlan);
       if (baseMessages.length === 0) {
-        try {
-          const rRes = await fetch('/api/rename', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ firstMessage: text, firstResponse: data.finalPlan }),
-          });
-          const rData = await rRes.json();
-          if (rData.title && onRenameSession) onRenameSession(rData.title);
-        } catch {}
+        // Delay rename so the messages setSessions call commits first
+        setTimeout(async () => {
+          try {
+            const rRes = await fetch('/api/rename', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ firstMessage: text, firstResponse: data.finalPlan }),
+            });
+            const rData = await rRes.json();
+            if (rData.title && onRenameSession) onRenameSession(rData.title);
+          } catch {}
+        }, 300);
       }
     } catch (e) {
       onMessagesUpdate([...next, { role: 'error', text: friendlyApiError(e.message), retryText: text }]);
